@@ -1,0 +1,74 @@
+# -------------------------
+# Node / React (Frontend)
+# -------------------------
+node_modules/
+dist/
+build/
+.vite/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# -------------------------
+# Python / Backend
+# -------------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# -------------------------
+# ML Models (VERY IMPORTANT)
+# -------------------------
+*.pkl
+*.joblib
+*.npy
+*.h5
+*.model
+
+# -------------------------
+# Data files
+# -------------------------
+*.csv
+*.txt
+
+# (Optional: if you want to keep dataset, comment above and use below)
+# KDDTrain+.txt
+# KDDTest+.txt
+
+# -------------------------
+# Metrics / Outputs
+# -------------------------
+metrics.json
+*.json
+
+# -------------------------
+# OS files
+# -------------------------
+.DS_Store
+Thumbs.db
+
+# -------------------------
+# IDE / Editor
+# -------------------------
+.vscode/
+.idea/
+
+# -------------------------
+# Environment variables
+# -------------------------
+.env
+
+# -------------------------
+# Logs
+# -------------------------
+logs/
+*.log
