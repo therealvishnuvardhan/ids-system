@@ -1,198 +1,133 @@
-import { useLocation, Link, useNavigate } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
+import UserPageLayout from "../components/UserPageLayout"
+import styled from "styled-components"
+import { cyberTheme } from "../theme"
+import { PageTitle, Card, CyberButton, Table, Th, Td } from "../components/UserPageStyles"
 
-const styles = {
-  container: {
-    minHeight: "100vh",
-    width: "100%",
-    background: "#1a1a1a",
-    color: "#ffffff",
-    fontFamily: "system-ui, -apple-system, sans-serif",
-    position: "fixed" as const,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    overflow: "auto"
-  },
-  navbar: {
-    background: "#2d2d2d",
-    padding: "15px 30px",
-    borderBottom: "1px solid #374151",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    position: "sticky" as const,
-    top: 0,
-    zIndex: 100
-  },
-  navBrand: {
-    fontSize: "1.2rem",
-    fontWeight: "bold" as const,
-    color: "#60a5fa",
-    cursor: "pointer"
-  },
-  navLinks: {
-    display: "flex",
-    gap: "20px"
-  },
-  navLink: {
-    color: "#9ca3af",
-    textDecoration: "none",
-    cursor: "pointer",
-    padding: "5px 10px"
-  },
-  activeNavLink: {
-    color: "#60a5fa",
-    textDecoration: "none",
-    cursor: "pointer",
-    padding: "5px 10px",
-    borderBottom: "2px solid #60a5fa"
-  },
-  contentWrapper: {
-    display: "flex",
-    justifyContent: "center",
-    padding: "20px"
-  },
-  content: {
-    maxWidth: "1200px",
-    width: "100%",
-    margin: "0 auto",
-    padding: "40px 20px"
-  },
-  card: {
-    background: "#2d2d2d",
-    padding: "30px",
-    borderRadius: "12px",
-    border: "1px solid #374151"
-  },
-  title: {
-    fontSize: "2rem",
-    color: "#60a5fa",
-    marginBottom: "30px",
-    textAlign: "center" as const
-  },
-  summary: {
-    display: "flex",
-    gap: "20px",
-    marginBottom: "30px",
-    flexWrap: "wrap" as const,
-    justifyContent: "center"
-  },
-  summaryItem: {
-    background: "#374151",
-    padding: "20px",
-    borderRadius: "8px",
-    flex: "1",
-    minWidth: "200px",
-    maxWidth: "250px"
-  },
-  summaryLabel: {
-    color: "#9ca3af",
-    fontSize: "0.9rem",
-    marginBottom: "10px",
-    textAlign: "center" as const
-  },
-  summaryValue: {
-    fontSize: "2rem",
-    fontWeight: "bold" as const,
-    color: "#60a5fa",
-    textAlign: "center" as const
-  },
-  table: {
-    width: "100%",
-    borderCollapse: "collapse" as const,
-    marginTop: "20px"
-  },
-  th: {
-    background: "#374151",
-    padding: "12px",
-    textAlign: "left" as const,
-    color: "#60a5fa",
-    borderBottom: "2px solid #4b5563"
-  },
-  td: {
-    padding: "12px",
-    borderBottom: "1px solid #374151",
-    color: "#d1d5db"
-  },
-  statusBadge: {
-    padding: "4px 8px",
-    borderRadius: "4px",
-    fontSize: "0.9rem",
-    fontWeight: "bold" as const,
-    display: "inline-block"
-  },
-  buttonContainer: {
-    display: "flex",
-    justifyContent: "center" as const,
-    marginTop: "30px",
-    gap: "15px"
-  },
-  button: {
-    display: "inline-block",
-    padding: "12px 24px",
-    background: "#3b82f6",
-    color: "white",
-    textDecoration: "none",
-    borderRadius: "6px",
-    fontWeight: "bold" as const,
-    border: "none",
-    cursor: "pointer"
-  },
-  secondaryButton: {
-    display: "inline-block",
-    padding: "12px 24px",
-    background: "#4b5563",
-    color: "white",
-    textDecoration: "none",
-    borderRadius: "6px",
-    fontWeight: "bold" as const,
-    border: "none",
-    cursor: "pointer"
+const CHART_COLORS = [cyberTheme.primary, cyberTheme.secondary, cyberTheme.success, cyberTheme.warning, cyberTheme.danger, "#82ca9d"]
+
+const SummaryGrid = styled.div`
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+`
+
+const SummaryItem = styled.div`
+  background: rgba(0, 242, 234, 0.05);
+  border: 1px solid ${cyberTheme.border};
+  padding: 1rem 1.5rem;
+  flex: 1;
+  min-width: 140px;
+  max-width: 200px;
+  text-align: center;
+`
+
+const SummaryLabel = styled.div`
+  font-family: ${cyberTheme.fontMono};
+  font-size: 0.75rem;
+  color: ${cyberTheme.textMuted};
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.25rem;
+`
+
+const SummaryValue = styled.div<{ $color?: string }>`
+  font-family: ${cyberTheme.fontDisplay};
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: ${p => p.$color || cyberTheme.primary};
+`
+
+const ChartGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
   }
+`
+
+const ChartContainer = styled.div`
+  background: rgba(13, 13, 13, 0.9);
+  border: 1px solid ${cyberTheme.border};
+  padding: 1.25rem;
+  height: 350px;
+`
+
+const ChartTitle = styled.h3`
+  font-family: ${cyberTheme.fontDisplay};
+  font-size: 0.85rem;
+  color: ${cyberTheme.primary};
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 1rem;
+  text-align: center;
+`
+
+const StatusBadge = styled.span<{ $attack?: boolean }>`
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: inline-block;
+  background: ${p => p.$attack ? `${cyberTheme.danger}20` : `${cyberTheme.success}20`};
+  color: ${p => p.$attack ? cyberTheme.danger : cyberTheme.success};
+`
+
+const RiskBadge = styled.span<{ $color: string }>`
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: inline-block;
+  background: ${p => p.$color}20;
+  color: ${p => p.$color};
+`
+
+const ButtonGroup = styled.div`
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+`
+
+const EmptyState = styled.div`
+  text-align: center;
+  padding: 3rem;
+  color: ${cyberTheme.textMuted};
+  font-family: ${cyberTheme.fontMono};
+`
+
+const tooltipStyle = {
+  backgroundColor: cyberTheme.bg,
+  border: `1px solid ${cyberTheme.border}`,
+  color: cyberTheme.text,
+  fontFamily: cyberTheme.fontMono,
 }
 
 function Results() {
   const location = useLocation()
   const navigate = useNavigate()
-  const results = location.state?.predictions || []
+  const data = location.state?.data
+  const results = data?.predictions || []
 
-  const handleLogout = () => {
-    localStorage.removeItem("isLoggedIn")
-    navigate("/login")
-  }
+  const beforeValidationData = data?.graph_before_validation || []
+  const afterValidationData = data?.graph_after_validation || []
+  const modelComparisonData = data?.graph_svm_vs_rf || []
 
   if (results.length === 0) {
     return (
-      <div style={styles.container}>
-        <div style={styles.navbar}>
-          <div style={styles.navBrand} onClick={() => navigate("/dashboard")}>
-            IDS DASHBOARD
-          </div>
-          <div style={styles.navLinks}>
-            <span style={styles.navLink} onClick={() => navigate("/dashboard")}>Dashboard</span>
-            <span style={styles.navLink} onClick={() => navigate("/upload")}>Upload</span>
-            <span style={styles.navLink} onClick={() => navigate("/alerts")}>Alerts</span>
-            <span style={styles.navLink} onClick={() => navigate("/reports")}>Reports</span>
-            <span style={styles.navLink} onClick={handleLogout}>Logout</span>
-          </div>
-        </div>
-        <div style={styles.contentWrapper}>
-          <div style={styles.content}>
-            <div style={styles.card}>
-              <h1 style={styles.title}>No Results</h1>
-              <p style={{ color: "#9ca3af", marginBottom: "20px", textAlign: "center" }}>
-                No analysis results found. Please upload a file first.
-              </p>
-              <div style={styles.buttonContainer}>
-                <Link to="/upload" style={styles.button}>
-                  Go to Upload
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <UserPageLayout>
+        <Card>
+          <EmptyState>
+            <PageTitle>No Results</PageTitle>
+            <p style={{ margin: "1rem 0" }}>No analysis results found. Please go back to dashboard for actions.</p>
+            <CyberButton onClick={() => navigate("/upload")}>Upload New File</CyberButton>
+          </EmptyState>
+        </Card>
+      </UserPageLayout>
     )
   }
 
@@ -200,126 +135,133 @@ function Results() {
   const normalCount = results.length - attackCount
   const avgConfidence = (results.reduce((acc: number, r: any) => acc + r.confidence_percentage, 0) / results.length).toFixed(1)
 
+  const getRiskColor = (level: string) => {
+    if (level === "High") return cyberTheme.danger
+    if (level === "Medium") return cyberTheme.warning
+    return cyberTheme.success
+  }
+
   return (
-    <div style={styles.container}>
-      {/* Navbar */}
-      <div style={styles.navbar}>
-        <div style={styles.navBrand} onClick={() => navigate("/dashboard")}>
-          IDS DASHBOARD
-        </div>
-        <div style={styles.navLinks}>
-          <span style={styles.navLink} onClick={() => navigate("/dashboard")}>Dashboard</span>
-          <span style={styles.navLink} onClick={() => navigate("/upload")}>Upload</span>
-          <span style={styles.navLink} onClick={() => navigate("/alerts")}>Alerts</span>
-          <span style={styles.navLink} onClick={() => navigate("/reports")}>Reports</span>
-          <span style={styles.navLink} onClick={handleLogout}>Logout</span>
-        </div>
-      </div>
+    <UserPageLayout>
+      <Card>
+        <PageTitle style={{ textAlign: "center", marginBottom: "1.5rem" }}>Analysis Results</PageTitle>
 
-      {/* Centered Content */}
-      <div style={styles.contentWrapper}>
-        <div style={styles.content}>
-          <div style={styles.card}>
-            <h1 style={styles.title}>Analysis Results</h1>
+        <SummaryGrid>
+          <SummaryItem>
+            <SummaryLabel>Total Records</SummaryLabel>
+            <SummaryValue>{results.length}</SummaryValue>
+          </SummaryItem>
+          <SummaryItem>
+            <SummaryLabel>Attacks Detected</SummaryLabel>
+            <SummaryValue $color={cyberTheme.danger}>{attackCount}</SummaryValue>
+          </SummaryItem>
+          <SummaryItem>
+            <SummaryLabel>Normal Traffic</SummaryLabel>
+            <SummaryValue $color={cyberTheme.success}>{normalCount}</SummaryValue>
+          </SummaryItem>
+          <SummaryItem>
+            <SummaryLabel>Avg Confidence</SummaryLabel>
+            <SummaryValue>{avgConfidence}%</SummaryValue>
+          </SummaryItem>
+        </SummaryGrid>
 
-            {/* Summary Stats */}
-            <div style={styles.summary}>
-              <div style={styles.summaryItem}>
-                <div style={styles.summaryLabel}>Total Records</div>
-                <div style={styles.summaryValue}>{results.length}</div>
-              </div>
-              <div style={styles.summaryItem}>
-                <div style={styles.summaryLabel}>Attacks Detected</div>
-                <div style={{ ...styles.summaryValue, color: "#ef4444" }}>{attackCount}</div>
-              </div>
-              <div style={styles.summaryItem}>
-                <div style={styles.summaryLabel}>Normal Traffic</div>
-                <div style={{ ...styles.summaryValue, color: "#10b981" }}>{normalCount}</div>
-              </div>
-              <div style={styles.summaryItem}>
-                <div style={styles.summaryLabel}>Avg Confidence</div>
-                <div style={styles.summaryValue}>{avgConfidence}%</div>
-              </div>
-            </div>
-
-            {/* Results Table */}
-            <div style={{ overflowX: "auto" }}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Status</th>
-                    <th style={styles.th}>Attack Type</th>
-                    <th style={styles.th}>Category</th>
-                    <th style={styles.th}>Risk Level</th>
-                    <th style={styles.th}>Confidence</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {results.map((row: any, index: number) => (
-                    <tr key={index}>
-                      <td style={styles.td}>
-                        <span style={{
-                          ...styles.statusBadge,
-                          background: row.status === "Attack Detected" ? "#ef444420" : "#10b98120",
-                          color: row.status === "Attack Detected" ? "#ef4444" : "#10b981"
-                        }}>
-                          {row.status}
-                        </span>
-                      </td>
-                      <td style={styles.td}>{row.attack_type}</td>
-                      <td style={styles.td}>{row.attack_category}</td>
-                      <td style={styles.td}>
-                        <span style={{
-                          ...styles.statusBadge,
-                          background: row.risk_level === "High" ? "#ef444420" : 
-                                     row.risk_level === "Medium" ? "#f59e0b20" : "#10b98120",
-                          color: row.risk_level === "High" ? "#ef4444" : 
-                                row.risk_level === "Medium" ? "#f59e0b" : "#10b981"
-                        }}>
-                          {row.risk_level}
-                        </span>
-                      </td>
-                      <td style={styles.td}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                          <span>{row.confidence_percentage}%</span>
-                          <div style={{
-                            width: "100px",
-                            height: "6px",
-                            background: "#374151",
-                            borderRadius: "3px",
-                            overflow: "hidden"
-                          }}>
-                            <div style={{
-                              width: `${row.confidence_percentage}%`,
-                              height: "100%",
-                              background: "#3b82f6",
-                              borderRadius: "3px"
-                            }} />
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
+        <ChartGrid>
+          <ChartContainer>
+            <ChartTitle>Traffic Before Validation (Protocols)</ChartTitle>
+            <ResponsiveContainer width="100%" height="80%">
+              <PieChart>
+                <Pie
+                  data={beforeValidationData}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={90}
+                  dataKey="value"
+                  label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                >
+                  {beforeValidationData.map((_: any, i: number) => (
+                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </Pie>
+                <RechartsTooltip contentStyle={tooltipStyle} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </ChartContainer>
 
-            {/* Action Buttons */}
-            <div style={styles.buttonContainer}>
-              <Link to="/upload" style={styles.button}>
-                Analyze Another File
-              </Link>
-              <button 
-                style={styles.secondaryButton}
-                onClick={() => navigate("/dashboard")}
-              >
-                Back to Dashboard
-              </button>
-            </div>
-          </div>
+          <ChartContainer>
+            <ChartTitle>Traffic After Validation (Categories)</ChartTitle>
+            <ResponsiveContainer width="100%" height="80%">
+              <BarChart data={afterValidationData}>
+                <CartesianGrid strokeDasharray="3 3" stroke={cyberTheme.border} />
+                <XAxis dataKey="name" stroke={cyberTheme.textMuted} />
+                <YAxis stroke={cyberTheme.textMuted} />
+                <RechartsTooltip contentStyle={tooltipStyle} />
+                <Legend />
+                <Bar dataKey="value" fill={cyberTheme.primary} name="Traffic Count" />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartContainer>
+
+          <ChartContainer style={{ gridColumn: "1 / -1" }}>
+            <ChartTitle>Model Comparison: SVM vs Random Forest vs XGBoost</ChartTitle>
+            <ResponsiveContainer width="100%" height="80%">
+              <BarChart data={modelComparisonData}>
+                <CartesianGrid strokeDasharray="3 3" stroke={cyberTheme.border} />
+                <XAxis dataKey="name" stroke={cyberTheme.textMuted} />
+                <YAxis domain={["auto", 100]} stroke={cyberTheme.textMuted} tickFormatter={(v) => `${v}%`} />
+                <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: any) => [`${Number(v ?? 0).toFixed(2)}%`, "Accuracy"]} />
+                <Legend />
+                <Bar dataKey="accuracy" name="Accuracy %">
+                  {modelComparisonData.map((_: any, i: number) => (
+                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartContainer>
+        </ChartGrid>
+
+        <div style={{ overflowX: "auto" }}>
+          <Table>
+            <thead>
+              <tr>
+                <Th>Status</Th>
+                <Th>Attack Type</Th>
+                <Th>Category</Th>
+                <Th>Risk Level</Th>
+                <Th>Confidence</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {results.map((row: any, i: number) => (
+                <tr key={i}>
+                  <Td>
+                    <StatusBadge $attack={row.status === "Attack Detected"}>{row.status}</StatusBadge>
+                  </Td>
+                  <Td>{row.attack_type}</Td>
+                  <Td>{row.attack_category}</Td>
+                  <Td>
+                    <RiskBadge $color={getRiskColor(row.risk_level)}>{row.risk_level}</RiskBadge>
+                  </Td>
+                  <Td>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <span>{row.confidence_percentage}%</span>
+                      <div style={{ width: "80px", height: "6px", background: "rgba(0,242,234,0.2)", borderRadius: 3, overflow: "hidden" }}>
+                        <div style={{ width: `${row.confidence_percentage}%`, height: "100%", background: cyberTheme.primary, borderRadius: 3 }} />
+                      </div>
+                    </div>
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
         </div>
-      </div>
-    </div>
+
+        <ButtonGroup>
+          <CyberButton onClick={() => navigate("/dashboard")}>Back to Dashboard</CyberButton>
+        </ButtonGroup>
+      </Card>
+    </UserPageLayout>
   )
 }
 

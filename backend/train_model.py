@@ -6,7 +6,6 @@ import numpy as np
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import LinearSVC
-from xgboost import XGBClassifier
 from sklearn.metrics import (
     accuracy_score,
     classification_report,
@@ -151,66 +150,28 @@ print("\nRandom Forest Accuracy:", rf_accuracy)
 print("\nRF Report:\n", classification_report(y_test, rf_pred))
 
 # -------------------------
-# Train XGBoost
-# -------------------------
-
-print("\nTraining XGBoost...")
-
-xgb_model = XGBClassifier(
-    n_estimators=200,
-    learning_rate=0.1,
-    max_depth=5,
-    random_state=42,
-    n_jobs=-1,
-    use_label_encoder=False,
-    eval_metric="mlogloss"
-)
-
-xgb_model.fit(X_train, y_train)
-xgb_pred = xgb_model.predict(X_test)
-
-xgb_accuracy = accuracy_score(y_test, xgb_pred)
-
-print("\nXGBoost Accuracy:", xgb_accuracy)
-print("\nXGB Report:\n", classification_report(y_test, xgb_pred))
-
-# -------------------------
-# Confusion Matrices
+# Save evaluation files
 # -------------------------
 
 cm_rf = confusion_matrix(y_test, rf_pred)
-cm_xgb = confusion_matrix(y_test, xgb_pred)
-
-np.save("cm_rf.npy", cm_rf)
-np.save("cm_xgb.npy", cm_xgb)
-
-# -------------------------
-# Metrics for frontend
-# -------------------------
+np.save("confusion_matrix.npy", cm_rf)
 
 metrics = {
     "svm_accuracy": float(svm_accuracy),
     "rf_accuracy": float(rf_accuracy),
-    "xgb_accuracy": float(xgb_accuracy),
-
     "rf_f1": float(f1_score(y_test, rf_pred, average="weighted")),
     "rf_recall": float(recall_score(y_test, rf_pred, average="weighted")),
-    "rf_precision": float(precision_score(y_test, rf_pred, average="weighted")),
-
-    "xgb_f1": float(f1_score(y_test, xgb_pred, average="weighted")),
-    "xgb_recall": float(recall_score(y_test, xgb_pred, average="weighted")),
-    "xgb_precision": float(precision_score(y_test, xgb_pred, average="weighted"))
+    "rf_precision": float(precision_score(y_test, rf_pred, average="weighted"))
 }
 
 with open("metrics.json", "w") as f:
     json.dump(metrics, f)
 
 # -------------------------
-# Save Models
+# Save models
 # -------------------------
 
 joblib.dump(rf_model, "rf_model.pkl")
-joblib.dump(xgb_model, "xgb_model.pkl")
 joblib.dump(svm_model, "svm_model.pkl")
 joblib.dump(encoders, "encoders.pkl")
 joblib.dump(label_encoder, "label_encoder.pkl")

@@ -1,18 +1,21 @@
 import { Navigate } from "react-router-dom"
 
-function ProtectedRoute({ children }: any){
+type ProtectedRouteProps = {
+  children: any
+  requiredRole?: "admin" | "user"
+}
 
-  const user = localStorage.getItem("username")
+function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps){
   const isLoggedIn = localStorage.getItem("isLoggedIn")
+  const role = localStorage.getItem("role")
 
-  // If account not created → go to signup
-  if(!user){
-    return <Navigate to="/signup" />
+  if (!isLoggedIn) {
+    return <Navigate to="/login" />
   }
 
-  // If account exists but not logged in → go to login
-  if(!isLoggedIn){
-    return <Navigate to="/login" />
+  if (requiredRole && role !== requiredRole) {
+    if (role === "admin") return <Navigate to="/admin" />
+    return <Navigate to="/dashboard" />
   }
 
   return children

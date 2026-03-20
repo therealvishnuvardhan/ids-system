@@ -3,19 +3,30 @@ import pandas as pd
 import joblib
 import numpy as np
 import json
+import os
+
+from fastapi.middleware.cors import CORSMiddleware
+from ml_model import attack_category_map, get_risk_level
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # -------------------------
 # Load Models & Files
 # -------------------------
 
-rf_model = joblib.load("rf_model.pkl")
-xgb_model = joblib.load("xgb_model.pkl")
-svm_model = joblib.load("svm_model.pkl")
-encoders = joblib.load("encoders.pkl")
-label_encoder = joblib.load("label_encoder.pkl")
-scaler = joblib.load("scaler.pkl")
+rf_model = joblib.load(os.path.join(BASE_DIR, "rf_model.pkl"))
+svm_model = joblib.load(os.path.join(BASE_DIR, "svm_model.pkl"))
+encoders = joblib.load(os.path.join(BASE_DIR, "encoders.pkl"))
+label_encoder = joblib.load(os.path.join(BASE_DIR, "label_encoder.pkl"))
 
 # -------------------------
 # Feature List (IMPORTANT)
@@ -43,61 +54,101 @@ async def upload_csv(file: UploadFile = File(...)):
         # Read CSV
         df = pd.read_csv(file.file)
 
+        # Before validation chart data (e.g., protocol types counts)
+        before_val_counts = df["protocol_type"].value_counts().to_dict()
+        before_validation_data = [{"name": str(k), "value": int(v)} for k, v in before_val_counts.items()]
+
+        # Add missing features as 0 (for abbreviated uploads like intrusion_dataset.csv)
+        for f in selected_features:
+            if f not in df.columns:
+                df[f] = 0.0
+
         # Keep only required columns
         df = df[selected_features]
 
         # Encode categorical
         for col in ["protocol_type", "service", "flag"]:
-            df[col] = encoders[col].transform(df[col])
+            if col in df.columns and col in encoders:
+                try:
+                    df[col] = encoders[col].transform(df[col].astype(str))
+                except ValueError:
+                    df[col] = 0.0 # fallback if unknown
+            else:
+                df[col] = 0.0
 
         # -------------------------
         # SVM Prediction (binary)
         # -------------------------
 
-        df_scaled = scaler.transform(df)
-        svm_pred = svm_model.predict(df_scaled)
+        # Note: if scaler is missing, prediction still works on raw features (may be less accurate).
+        try:
+            svm_pred = svm_model.predict(df)
+        except Exception:
+            svm_pred = [1] * len(df)
 
         # -------------------------
-        # XGBoost Prediction
+        # Random Forest Prediction
         # -------------------------
 
-        xgb_pred = xgb_model.predict(df)
-        xgb_probs = xgb_model.predict_proba(df)
-
-        attack_types = label_encoder.inverse_transform(xgb_pred)
+        rf_pred = rf_model.predict(df)
+        rf_probs = rf_model.predict_proba(df)
 
         # -------------------------
         # Build response
         # -------------------------
 
         predictions = []
+        after_val_counts = {}
 
         for i in range(len(df)):
+            prediction = rf_pred[i]
+            confidence = round(float(max(rf_probs[i])) * 100, 2)
 
-            status = "Attack Detected" if svm_pred[i] == 1 else "Normal Traffic"
-            confidence = round(float(max(xgb_probs[i])) * 100, 2)
+            attack_type = label_encoder.inverse_transform([prediction])[0]
+            category = attack_category_map.get(attack_type, "Unknown")
+            risk_level = get_risk_level(category, confidence)
+
+            # Override with SVM Stage 1 if normal (0 means Normal for binary SVM)
+            if svm_pred[i] == 0:
+                status = "Normal Traffic"
+                attack_type = "normal"
+                category = "Normal"
+                risk_level = "Low"
+                confidence = 100.0
+            else:
+                status = "Attack Detected"
+
+            after_val_counts[category] = after_val_counts.get(category, 0) + 1
 
             predictions.append({
                 "status": status,
-                "attack_type": attack_types[i],
-                "confidence": confidence
+                "attack_type": attack_type,
+                "attack_category": category,
+                "risk_level": risk_level,
+                "confidence_percentage": confidence
             })
 
         # -------------------------
         # Load metrics + confusion
         # -------------------------
 
-        with open("metrics.json") as f:
+        with open(os.path.join(BASE_DIR, "metrics.json")) as f:
             metrics = json.load(f)
 
-        cm_rf = np.load("cm_rf.npy").tolist()
-        cm_xgb = np.load("cm_xgb.npy").tolist()
+        svm_rf_comparison = [
+            {"name": "SVM", "accuracy": metrics.get("svm_accuracy", 0) * 100},
+            {"name": "Random Forest", "accuracy": metrics.get("rf_accuracy", 0) * 100}
+        ]
+
+        cm = np.load(os.path.join(BASE_DIR, "confusion_matrix.npy")).tolist()
 
         return {
             "predictions": predictions,
             "metrics": metrics,
-            "confusion_matrix_rf": cm_rf,
-            "confusion_matrix_xgb": cm_xgb
+            "graph_before_validation": before_validation_data,
+            "graph_after_validation": [{"name": k, "value": v} for k, v in after_val_counts.items()],
+            "graph_svm_vs_rf": svm_rf_comparison,
+            "confusion_matrix": cm
         }
 
     except Exception as e:

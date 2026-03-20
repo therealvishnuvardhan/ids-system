@@ -1,104 +1,15 @@
 import { useState } from "react"
-import { useNavigate, Link } from "react-router-dom"
-
-const styles = {
-  container: {
-    minHeight: "100vh",
-    width: "100%",
-    background: "#1a1a1a",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: "20px",
-    margin: 0,
-    position: "fixed" as const,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0
-  },
-  card: {
-    background: "#2d2d2d",
-    padding: "40px",
-    borderRadius: "12px",
-    width: "100%",
-    maxWidth: "400px",
-    boxShadow: "0 4px 6px rgba(0, 0, 0, 0.3)",
-    border: "1px solid #374151",
-    margin: "auto"
-  },
-  title: {
-    fontSize: "2rem",
-    color: "#60a5fa",
-    marginBottom: "30px",
-    textAlign: "center" as const
-  },
-  form: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "20px"
-  },
-  inputGroup: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "8px"
-  },
-  label: {
-    color: "#9ca3af",
-    fontSize: "0.9rem",
-    fontWeight: "bold" as const
-  },
-  input: {
-    padding: "12px",
-    background: "#374151",
-    border: "1px solid #4b5563",
-    borderRadius: "6px",
-    color: "#ffffff",
-    fontSize: "1rem",
-    outline: "none",
-    width: "100%",
-    boxSizing: "border-box" as const
-  },
-  button: {
-    padding: "14px",
-    background: "#3b82f6",
-    color: "white",
-    border: "none",
-    borderRadius: "6px",
-    fontSize: "1rem",
-    fontWeight: "bold" as const,
-    cursor: "pointer",
-    marginTop: "10px",
-    transition: "background 0.3s",
-    width: "100%",
-    boxSizing: "border-box" as const
-  },
-  buttonDisabled: {
-    padding: "14px",
-    background: "#4b5563",
-    color: "#9ca3af",
-    border: "none",
-    borderRadius: "6px",
-    fontSize: "1rem",
-    fontWeight: "bold" as const,
-    cursor: "not-allowed",
-    marginTop: "10px",
-    width: "100%",
-    boxSizing: "border-box" as const
-  },
-  link: {
-    color: "#60a5fa",
-    textDecoration: "none",
-    textAlign: "center" as const,
-    marginTop: "20px",
-    display: "block"
-  }
-}
+import { useNavigate } from "react-router-dom"
+import { ensureAppData, getUsers, saveUsers, setLoggedInUser, incrementMetric, getConfig, addAuditLog } from "../utils/authUtils"
+import AuthForm from "../components/AuthForm"
+import CyberPattern from "../components/CyberPattern"
+import CyberStatusModal from "../components/CyberStatusModal"
 
 function Signup() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
+  const [statusModal, setStatusModal] = useState(false)
   const navigate = useNavigate()
 
   async function handleSignup(e: React.FormEvent) {
@@ -117,62 +28,70 @@ function Signup() {
       return
     }
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    ensureAppData()
+    const config = getConfig()
+    if (!config.allowSignup) {
+      alert("Signup is currently disabled by admin")
+      setLoading(false)
+      return
+    }
 
-    localStorage.setItem("username", username)
-    localStorage.setItem("password", password)
-    localStorage.setItem("isLoggedIn", "true")
+    const users = getUsers()
+    if (users.length >= config.maxUsers) {
+      alert("User limit reached. Contact admin.")
+      setLoading(false)
+      return
+    }
 
-    alert("Account created successfully!")
+    const existing = users.find(u => u.username === username)
+
+    if (existing) {
+      alert("Username already exists")
+      setLoading(false)
+      return
+    }
+
+    const newUser = {
+      username,
+      password,
+      role: "user" as const,
+      active: true
+    }
+    users.push(newUser)
+    saveUsers(users)
+    incrementMetric("totalUsers", 1)
+    addAuditLog({ type: "signup", user: username, details: `User ${username} signed up` })
+
+    await new Promise(resolve => setTimeout(resolve, 500))
+
+    setLoggedInUser(username, "user")
+
     setLoading(false)
-    navigate("/dashboard")
+    setStatusModal(true)
   }
 
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>Create Account</h1>
-        
-        <form onSubmit={handleSignup} style={styles.form}>
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Username</label>
-            <input
-              type="text"
-              style={styles.input}
-              placeholder="Enter username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              disabled={loading}
-            />
-          </div>
-
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Password</label>
-            <input
-              type="password"
-              style={styles.input}
-              placeholder="Enter password (min 6 chars)"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
-            />
-          </div>
-
-          <button 
-            type="submit" 
-            style={loading ? styles.buttonDisabled : styles.button}
-            disabled={loading}
-          >
-            {loading ? "Creating account..." : "Sign Up"}
-          </button>
-        </form>
-
-        <Link to="/login" style={styles.link}>
-          Already have an account? Login
-        </Link>
-      </div>
-    </div>
+    <>
+      <CyberPattern />
+      {statusModal && (
+        <CyberStatusModal
+          message="Credentials Passed"
+          onClose={() => {
+            setStatusModal(false)
+            navigate("/dashboard")
+          }}
+        />
+      )}
+      <AuthForm
+        mode="signup"
+        username={username}
+        password={password}
+        loading={loading}
+        onUsernameChange={setUsername}
+        onPasswordChange={setPassword}
+        onSubmit={handleSignup}
+      />
+    </>
   )
 }
 

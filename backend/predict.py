@@ -11,28 +11,41 @@ print("Loading trained models...")
 binary_model = joblib.load("binary_model.pkl")
 multi_model = joblib.load("multi_model.pkl")
 
-features = [
-'duration',
-'protocol_type',
-'src_bytes',
-'dst_bytes',
-'count',
-'serror_rate'
+selected_features = [
+    "duration","protocol_type","service","flag","src_bytes","dst_bytes",
+    "wrong_fragment","num_compromised","num_root","count","srv_count",
+    "serror_rate","srv_serror_rate","same_srv_rate","diff_srv_rate",
+    "dst_host_count","dst_host_srv_count","dst_host_same_srv_rate",
+    "dst_host_diff_srv_rate","dst_host_same_src_port_rate",
+    "dst_host_srv_diff_host_rate","dst_host_serror_rate",
+    "dst_host_srv_serror_rate","dst_host_rerror_rate",
+    "dst_host_srv_rerror_rate"
 ]
 
-protocol_map = {
-'tcp':0,
-'udp':1,
-'icmp':2
-}
+# Use same maps as training for categorical columns
+protocol_map = {'tcp':0,'udp':1,'icmp':2}
+service_map = {}  # if you trained with LabelEncoder, save mappings; for quick script we fallback
+flag_map = {}
 
 df = pd.read_csv("intrusion_dataset.csv")
 
-df['protocol_type'] = df['protocol_type'].map(protocol_map)
+df.fillna(0, inplace=True)
 
-df.fillna(0,inplace=True)
+# Map known categoricals; unknown categories remain unchanged or 0
+if 'protocol_type' in df.columns:
+    df['protocol_type'] = df['protocol_type'].map(protocol_map).fillna(0)
 
-X = df[features]
+# If service and flag are strings, provide fallback numeric mapping to avoid errors
+if 'service' in df.columns and df['service'].dtype == object:
+    df['service'] = df['service'].astype('category').cat.codes
+if 'flag' in df.columns and df['flag'].dtype == object:
+    df['flag'] = df['flag'].astype('category').cat.codes
+
+for col in selected_features:
+    if col not in df.columns:
+        df[col] = 0.0
+
+X = df[selected_features]
 
 print("\n==============================")
 print(" INTRUSION DETECTION SYSTEM")

@@ -1,11 +1,12 @@
 import joblib
 import pandas as pd
+import os
 
-rf_model = joblib.load("rf_model.pkl")
-svm_model = joblib.load("svm_model.pkl")
-xgb_model = joblib.load("xgb_model.pkl")
-encoders = joblib.load("encoders.pkl")
-label_encoder = joblib.load("label_encoder.pkl")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+rf_model = joblib.load(os.path.join(BASE_DIR, "rf_model.pkl"))
+svm_model = joblib.load(os.path.join(BASE_DIR, "svm_model.pkl"))
+encoders = joblib.load(os.path.join(BASE_DIR, "encoders.pkl"))
+label_encoder = joblib.load(os.path.join(BASE_DIR, "label_encoder.pkl"))
 
 attack_category_map = {
 
@@ -53,46 +54,41 @@ def get_risk_level(category, confidence):
 
 
 def predict_network(data_dict):
+    selected_features = [
+        "duration","protocol_type","service","flag","src_bytes","dst_bytes",
+        "wrong_fragment","num_compromised","num_root","count","srv_count",
+        "serror_rate","srv_serror_rate","same_srv_rate","diff_srv_rate",
+        "dst_host_count","dst_host_srv_count","dst_host_same_srv_rate",
+        "dst_host_diff_srv_rate","dst_host_same_src_port_rate",
+        "dst_host_srv_diff_host_rate","dst_host_serror_rate",
+        "dst_host_srv_serror_rate","dst_host_rerror_rate",
+        "dst_host_srv_rerror_rate"
+    ]
 
     df = pd.DataFrame([data_dict])
 
-    for col in ["protocol_type", "service", "flag"]:
-
-        try:
-            df[col] = encoders[col].transform(df[col])
-
-        except ValueError:
-
-            return {
-                "error": f"Unknown value for '{col}'"
-            }
-
-    # Add missing zero features since we expanded the feature set in train_model
-    # but the frontend still might only send the basic 6.
-    # To handle arbitrary CSV files that DO have all 25 features, we should just ensure
-    # the DataFrame has the exact shape expected by the models.
-    expected_features = [
-        "duration", "protocol_type", "service", "flag", "src_bytes", "dst_bytes",
-        "wrong_fragment", "num_compromised", "num_root", "count", "srv_count",
-        "serror_rate", "srv_serror_rate", "same_srv_rate", "diff_srv_rate",
-        "dst_host_count", "dst_host_srv_count", "dst_host_same_srv_rate",
-        "dst_host_diff_srv_rate", "dst_host_same_src_port_rate",
-        "dst_host_srv_diff_host_rate", "dst_host_serror_rate",
-        "dst_host_srv_serror_rate", "dst_host_rerror_rate", "dst_host_srv_rerror_rate"
-    ]
-    
-    for f in expected_features:
+    # fill missing expected features with zeros
+    for f in selected_features:
         if f not in df.columns:
             df[f] = 0.0
 
-    df = df[expected_features]
+    # Only keep expected order
+    df = df[selected_features]
 
-    # -------- Stage 1 (SVM) --------
+    # encode categories
+    for col in ["protocol_type", "service", "flag"]:
+        if col in df.columns and col in encoders:
+            try:
+                df[col] = encoders[col].transform(df[col].astype(str))
+            except ValueError:
+                df[col] = 0.0
+        else:
+            df[col] = 0.0
 
     svm_pred = svm_model.predict(df)
 
+    # If SVM says normal
     if svm_pred[0] == 0:
-
         return {
             "status": "Normal Traffic",
             "attack_type": "normal",
@@ -101,35 +97,18 @@ def predict_network(data_dict):
             "confidence_percentage": 100
         }
 
-    # -------- Stage 2 (Random Forest + XGBoost) --------
-
     rf_pred = rf_model.predict(df)
     rf_probs = rf_model.predict_proba(df)
-    
-    xgb_pred = xgb_model.predict(df)
-    xgb_probs = xgb_model.predict_proba(df)
-
-    # Simple ensamble: pick the one with the higher max confidence probability
     rf_conf = float(max(rf_probs[0]))
-    xgb_conf = float(max(xgb_probs[0]))
 
-    if xgb_conf > rf_conf:
-        prediction = xgb_pred
-        confidence = round(xgb_conf * 100, 2)
-    else:
-        prediction = rf_pred
-        confidence = round(rf_conf * 100, 2)
-
-    attack_type = label_encoder.inverse_transform(prediction)[0]
-
+    attack_type = label_encoder.inverse_transform([rf_pred[0]])[0]
     category = attack_category_map.get(attack_type, "Unknown")
-
-    risk_level = get_risk_level(category, confidence)
+    risk_level = get_risk_level(category, round(rf_conf * 100, 2))
 
     return {
         "status": "Attack Detected",
         "attack_type": attack_type,
         "attack_category": category,
         "risk_level": risk_level,
-        "confidence_percentage": confidence
+        "confidence_percentage": round(rf_conf * 100, 2)
     }
