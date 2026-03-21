@@ -1,8 +1,29 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import AdminNavbar from "../components/AdminNavbar"
-import { getMetrics, getUsers, removeUser, logoutCurrentSession, addAuditLog, getAuditLogs, getConfig, saveConfig } from "../utils/authUtils"
+import AdminSidebar from "../components/AdminSidebar"
+import AdminPageLayout from "../components/AdminPageLayout"
+import {
+  AdminCard,
+  AdminLabel,
+  AdminValue,
+  AdminTable,
+  AdminTh,
+  AdminTd,
+  AdminButton,
+  AdminButtonDanger,
+} from "../components/AdminPageStyles"
+import {
+  getMetrics,
+  getUsers,
+  removeUser,
+  addAuditLog,
+  getAuditLogs,
+  getConfig,
+  saveConfig,
+} from "../utils/authUtils"
 import type { AppConfig, AuditEvent } from "../utils/authUtils"
+import styled from "styled-components"
+import { adminTheme } from "../adminTheme"
 
 type Metrics = {
   totalLogins: number
@@ -17,186 +38,237 @@ type AppUser = {
   role: "user" | "admin"
 }
 
-const styles = {
-  container: {
-    minHeight: "100vh",
-    width: "100%",
-    background: "#111827",
-    color: "#fff",
-    fontFamily: "system-ui, -apple-system, sans-serif",
-    position: "relative" as const,
-    overflow: "auto",
-    padding: "20px 0 40px"
-  },
-  centerContent: {
-    maxWidth: "1100px",
-    margin: "0 auto"
-  },
-  header: {
-    background: "#1f2937",
-    padding: "20px",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center"
-  },
-  title: { fontSize: "1.7rem", color: "#38bdf8" },
-  nav: { display: "flex", gap: "12px" },
-  navButton: { background: "#2563eb", color: "white", border: "none", borderRadius: "6px", padding: "10px 12px", cursor: "pointer" },
-  content: { padding: "24px" },
-  cards: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "14px", marginBottom: "20px" },
-  card: { background: "#111827", border: "1px solid #374151", borderRadius: "10px", padding: "14px" },
-  label: { color: "#9ca3af", fontSize: "0.85rem", marginBottom: "6px" },
-  value: { fontSize: "1.5rem", fontWeight: "700", color: "#f8fafc" },
-  table: { width: "100%", borderCollapse: "collapse" as const, marginTop: "10px", fontSize: "0.95rem" },
-  th: { borderBottom: "1px solid #374151", padding: "10px", textAlign: "left" as const, color: "#cbd5e1" },
-  td: { borderBottom: "1px solid #374151", padding: "10px", color: "#f8fafc" },
-  danger: { background: "#ef4444", color: "white", border: "none", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }
-}
+const StatsGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+`
+
+const StatCard = styled(AdminCard)`
+  padding: 1.25rem;
+  &:hover {
+    border-color: rgba(124, 58, 237, 0.5);
+    box-shadow: 0 0 20px rgba(124, 58, 237, 0.15);
+  }
+`
+
+const Grid2 = styled.div`
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+`
+
+const Grid1 = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+  @media (max-width: 700px) {
+    grid-template-columns: 1fr;
+  }
+`
+
+const LogFeed = styled.div`
+  max-height: 220px;
+  overflow-y: auto;
+  font-size: 0.9rem;
+`
+
+const LogEntry = styled.div`
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(124, 58, 237, 0.2);
+  padding-bottom: 0.5rem;
+  color: ${adminTheme.text};
+`
 
 function AdminDashboard() {
   const navigate = useNavigate()
   const [metrics, setMetrics] = useState<Metrics>(getMetrics())
-  const [users, setUsers] = useState<AppUser[]>(getUsers().map(u => ({ username: u.username, role: u.role })))
+  const [users, setUsers] = useState<AppUser[]>(
+    getUsers().map((u) => ({ username: u.username, role: u.role }))
+  )
   const [auditLogs, setAuditLogs] = useState<AuditEvent[]>(getAuditLogs())
   const [config, setConfig] = useState<AppConfig>(getConfig())
 
   useEffect(() => {
+    if (localStorage.getItem("role") !== "admin") {
+      navigate("/login")
+      return
+    }
     const timer = setInterval(() => {
       setMetrics(getMetrics())
-      setUsers(getUsers().map(u => ({ username: u.username, role: u.role })))
+      setUsers(getUsers().map((u) => ({ username: u.username, role: u.role })))
       setAuditLogs(getAuditLogs())
       setConfig(getConfig())
     }, 800)
-
     return () => clearInterval(timer)
-  }, [])
-
-  const handleLogout = () => {
-    logoutCurrentSession()
-    navigate("/login")
-  }
+  }, [navigate])
 
   const handleConfigToggle = () => {
     const next = { ...config, allowSignup: !config.allowSignup }
     saveConfig(next)
     setConfig(next)
-    addAuditLog({ type: "config_update", user: "admin", details: `Config changed: allowSignup to ${next.allowSignup}` })
+    addAuditLog({
+      type: "config_update",
+      user: "admin",
+      details: `Config changed: allowSignup to ${next.allowSignup}`,
+    })
   }
 
   const handleRemove = (username: string) => {
     if (!window.confirm(`Remove user ${username}?`)) return
     removeUser(username)
-    setUsers(getUsers().map(u => ({ username: u.username, role: u.role })))
+    setUsers(getUsers().map((u) => ({ username: u.username, role: u.role })))
     setMetrics(getMetrics())
   }
 
   return (
-    <div>
-      <AdminNavbar />
-      <div style={styles.container}>
-        <div style={styles.header}>
-          <div>
-            <div style={styles.title}>Admin Portal</div>
-            <div style={{ color: "#d1d5db" }}>Real-time user metrics and access control</div>
-          </div>
-          <div style={styles.nav}>
-            <button style={styles.navButton} onClick={() => navigate("/dashboard")}>User View</button>
-            <button style={styles.navButton} onClick={handleLogout}>Logout</button>
-          </div>
-        </div>
+    <>
+      <AdminSidebar />
+      <AdminPageLayout
+        title="Admin Control Panel"
+        description="Monitor and manage your intrusion detection system."
+      >
+        <StatsGrid>
+          <StatCard>
+            <AdminLabel>Total Users</AdminLabel>
+            <AdminValue>{metrics.totalUsers}</AdminValue>
+          </StatCard>
+          <StatCard>
+            <AdminLabel>Active Users</AdminLabel>
+            <AdminValue>{metrics.activeUsers}</AdminValue>
+          </StatCard>
+          <StatCard>
+            <AdminLabel>Total Logins</AdminLabel>
+            <AdminValue>{metrics.totalLogins}</AdminValue>
+          </StatCard>
+          <StatCard>
+            <AdminLabel>Removed Users</AdminLabel>
+            <AdminValue>{metrics.removedUsers}</AdminValue>
+          </StatCard>
+          <StatCard>
+            <AdminLabel>Sessions Opened</AdminLabel>
+            <AdminValue>{metrics.totalSessions}</AdminValue>
+          </StatCard>
+        </StatsGrid>
 
-        <div style={styles.centerContent}>
-          <div style={styles.content}>
-            <div style={styles.cards}>
-          <div style={styles.card}><div style={styles.label}>Total Users</div><div style={styles.value}>{metrics.totalUsers}</div></div>
-          <div style={styles.card}><div style={styles.label}>Active Users</div><div style={styles.value}>{metrics.activeUsers}</div></div>
-          <div style={styles.card}><div style={styles.label}>Total Logins</div><div style={styles.value}>{metrics.totalLogins}</div></div>
-          <div style={styles.card}><div style={styles.label}>Removed Users</div><div style={styles.value}>{metrics.removedUsers}</div></div>
-          <div style={styles.card}><div style={styles.label}>Sessions Opened</div><div style={styles.value}>{metrics.totalSessions}</div></div>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: "16px", marginTop: "20px" }}>
-          <div style={styles.card}>
-            <h2 style={{ margin: 0, color: "#e2e8f0" }}>User Management</h2>
-            <p style={{ color: "#9ca3af", margin: "8px 0 12px" }}>Remove users and inspect details.</p>
-            <table style={styles.table}>
+        <Grid2>
+          <AdminCard>
+            <h2 style={{ margin: 0, color: adminTheme.primary, fontFamily: adminTheme.fontDisplay }}>
+              User Management
+            </h2>
+            <p style={{ color: adminTheme.textMuted, margin: "8px 0 12px", fontSize: "0.9rem" }}>
+              Remove users and inspect details.
+            </p>
+            <AdminTable>
               <thead>
                 <tr>
-                  <th style={styles.th}>Username</th>
-                  <th style={styles.th}>Role</th>
-                  <th style={styles.th}>Action</th>
+                  <AdminTh>Username</AdminTh>
+                  <AdminTh>Role</AdminTh>
+                  <AdminTh>Action</AdminTh>
                 </tr>
               </thead>
               <tbody>
                 {users.map((user) => (
                   <tr key={user.username}>
-                    <td style={styles.td}>{user.username}</td>
-                    <td style={styles.td}>{user.role}</td>
-                    <td style={styles.td}>
+                    <AdminTd>{user.username}</AdminTd>
+                    <AdminTd>{user.role}</AdminTd>
+                    <AdminTd>
                       {user.role === "admin" ? (
-                        <span style={{ color: "#9ca3af" }}>Cannot remove admin</span>
+                        <span style={{ color: adminTheme.textMuted }}>Cannot remove admin</span>
                       ) : (
-                        <button style={styles.danger} onClick={() => handleRemove(user.username)}>Remove</button>
+                        <AdminButtonDanger onClick={() => handleRemove(user.username)}>
+                          Remove
+                        </AdminButtonDanger>
                       )}
-                    </td>
+                    </AdminTd>
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </AdminTable>
+          </AdminCard>
 
-          <div style={styles.card}>
-            <h2 style={{ margin: 0, color: "#e2e8f0" }}>Admin Config</h2>
-            <p style={{ color: "#9ca3af", margin: "8px 0 12px" }}>Control signup and limits.</p>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-              <span style={{ color: "#e2e8f0" }}>Allow signup</span>
-              <button style={{ ...styles.navButton, background: config.allowSignup ? "#10b981" : "#6b7280" }} onClick={handleConfigToggle}>{config.allowSignup ? "ON" : "OFF"}</button>
+          <AdminCard>
+            <h2 style={{ margin: 0, color: adminTheme.primary, fontFamily: adminTheme.fontDisplay }}>
+              Admin Config
+            </h2>
+            <p style={{ color: adminTheme.textMuted, margin: "8px 0 12px", fontSize: "0.9rem" }}>
+              Control signup and limits.
+            </p>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", alignItems: "center" }}>
+              <span style={{ color: adminTheme.text }}>Allow signup</span>
+              <AdminButton
+                style={{
+                  background: config.allowSignup ? adminTheme.success : adminTheme.textMuted,
+                  borderColor: config.allowSignup ? adminTheme.success : adminTheme.textMuted,
+                  color: "#000",
+                }}
+                onClick={handleConfigToggle}
+              >
+                {config.allowSignup ? "ON" : "OFF"}
+              </AdminButton>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-              <span style={{ color: "#e2e8f0" }}>Max users</span>
-              <span style={{ color: "#f8fafc" }}>{config.maxUsers}</span>
+              <span style={{ color: adminTheme.text }}>Max users</span>
+              <span style={{ color: adminTheme.primary }}>{config.maxUsers}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-              <span style={{ color: "#e2e8f0" }}>Current users</span>
-              <span style={{ color: "#f8fafc" }}>{metrics.totalUsers}</span>
+              <span style={{ color: adminTheme.text }}>Current users</span>
+              <span style={{ color: adminTheme.primary }}>{metrics.totalUsers}</span>
             </div>
-            <div style={{ marginTop: "10px", fontSize: "0.9rem", color: "#9ca3af" }}>
+            <div style={{ marginTop: "12px", fontSize: "0.9rem", color: adminTheme.textMuted }}>
               Signup is currently <strong>{config.allowSignup ? "enabled" : "disabled"}</strong>.
             </div>
-          </div>
-        </div>
+          </AdminCard>
+        </Grid2>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginTop: "20px" }}>
-          <div style={styles.card}>
-            <h2 style={{ margin: 0, color: "#e2e8f0" }}>Session Activity Feed</h2>
-            <div style={{ marginTop: "10px", maxHeight: "220px", overflowY: "auto", background: "#111827", border: "1px solid #374151", borderRadius: "8px", padding: "10px" }}>
-              {auditLogs.filter((log) => log.type === "login" || log.type === "logout").slice(0, 10).map((log) => (
-                <div key={log.id} style={{ marginBottom: "8px", borderBottom: "1px solid #1f2937", paddingBottom: "6px" }}>
-                  <div style={{ color: "#60a5fa", fontWeight: 600 }}>{log.user}</div>
-                  <div style={{ color: "#cbd5e1", fontSize: "0.85rem" }}>{new Date(log.timestamp).toLocaleString()}</div>
-                  <div style={{ color: "#d1d5db", fontSize: "0.9rem" }}>{log.details}</div>
-                </div>
-              ))}
-            </div>
-          </div>
+        <Grid1>
+          <AdminCard>
+            <h2 style={{ margin: 0, color: adminTheme.primary, fontFamily: adminTheme.fontDisplay }}>
+              Session Activity Feed
+            </h2>
+            <LogFeed>
+              {auditLogs
+                .filter((log) => log.type === "login" || log.type === "logout")
+                .slice(0, 10)
+                .map((log) => (
+                  <LogEntry key={log.id}>
+                    <div style={{ color: adminTheme.secondary, fontWeight: 600 }}>{log.user}</div>
+                    <div style={{ color: adminTheme.textMuted, fontSize: "0.8rem" }}>
+                      {new Date(log.timestamp).toLocaleString()}
+                    </div>
+                    <div style={{ color: adminTheme.text, fontSize: "0.85rem" }}>{log.details}</div>
+                  </LogEntry>
+                ))}
+            </LogFeed>
+          </AdminCard>
 
-          <div style={styles.card}>
-            <h2 style={{ margin: 0, color: "#e2e8f0" }}>Audit Logs</h2>
-            <div style={{ marginTop: "10px", maxHeight: "220px", overflowY: "auto", background: "#111827", border: "1px solid #374151", borderRadius: "8px", padding: "10px" }}>
+          <AdminCard>
+            <h2 style={{ margin: 0, color: adminTheme.primary, fontFamily: adminTheme.fontDisplay }}>
+              Audit Logs
+            </h2>
+            <LogFeed>
               {auditLogs.slice(0, 10).map((log) => (
-                <div key={log.id} style={{ marginBottom: "8px", borderBottom: "1px solid #1f2937", paddingBottom: "6px" }}>
-                  <div style={{ color: "#f8fafc", fontSize: "0.9rem" }}><strong>{log.type.toUpperCase()}</strong> - {log.user}</div>
-                  <div style={{ color: "#9ca3af", fontSize: "0.8rem" }}>{new Date(log.timestamp).toLocaleString()}</div>
-                  <div style={{ color: "#d1d5db", fontSize: "0.85rem" }}>{log.details}</div>
-                </div>
+                <LogEntry key={log.id}>
+                  <div style={{ color: adminTheme.text }}>
+                    <strong>{log.type.toUpperCase()}</strong> - {log.user}
+                  </div>
+                  <div style={{ color: adminTheme.textMuted, fontSize: "0.8rem" }}>
+                    {new Date(log.timestamp).toLocaleString()}
+                  </div>
+                  <div style={{ color: adminTheme.text, fontSize: "0.85rem" }}>{log.details}</div>
+                </LogEntry>
               ))}
-            </div>
-          </div>
-        </div>
-          </div>
-        </div>
-      </div>
-    </div>
+            </LogFeed>
+          </AdminCard>
+        </Grid1>
+      </AdminPageLayout>
+    </>
   )
 }
 

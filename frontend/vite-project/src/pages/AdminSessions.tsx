@@ -1,31 +1,68 @@
-import AdminNavbar from "../components/AdminNavbar"
+import { useEffect } from "react"
+import { useNavigate } from "react-router-dom"
+import AdminSidebar from "../components/AdminSidebar"
+import AdminPageLayout from "../components/AdminPageLayout"
+import { AdminCard } from "../components/AdminPageStyles"
 import { getAuditLogs } from "../utils/authUtils"
+import { adminTheme } from "../adminTheme"
+import styled from "styled-components"
 
-function AdminSessions(){
-  const logs = getAuditLogs().filter(log => log.type === "login" || log.type === "logout").slice(0, 50)
+const LogContainer = styled.div`
+  max-height: 70vh;
+  overflow-y: auto;
+`
+
+const LogEntry = styled.div`
+  margin-bottom: 1rem;
+  border-bottom: 1px solid ${adminTheme.border};
+  padding-bottom: 0.75rem;
+`
+
+function AdminSessions() {
+  const navigate = useNavigate()
+  const logs = getAuditLogs()
+    .filter((log) => log.type === "login" || log.type === "logout")
+    .slice(0, 50)
+
+  useEffect(() => {
+    if (localStorage.getItem("role") !== "admin") {
+      navigate("/login")
+    }
+  }, [navigate])
 
   return (
-    <div>
-      <AdminNavbar />
-      <div style={{ minHeight: "100vh", padding: "30px", background: "#0b1120", color: "#e2e8f0", display: "flex", justifyContent: "center" as const }}>
-        <div style={{ width: "100%", maxWidth: "1000px" }}>
-          <h1 style={{ color: "#38bdf8" }}>Session Activity Feed</h1>
-          <div style={{ marginTop: "12px", background: "#111827", borderRadius: "10px", padding: "16px", border: "1px solid #334155", maxHeight: "70vh", overflowY: "auto" }}>
+    <>
+      <AdminSidebar />
+      <AdminPageLayout
+        title="Admin Control Panel"
+        description="Monitor active user sessions and activities."
+      >
+        <AdminCard>
+          <h2 style={{ margin: "0 0 16px", color: adminTheme.primary, fontFamily: adminTheme.fontDisplay }}>
+            Session Activity Feed
+          </h2>
+          <LogContainer>
             {logs.length === 0 ? (
-              <p style={{ color: "#94a3b8" }}>No session activity yet.</p>
+              <p style={{ color: adminTheme.textMuted }}>No session activity yet.</p>
             ) : (
               logs.map((log) => (
-                <div key={log.id} style={{ marginBottom: "12px", borderBottom: "1px solid #1f2937", paddingBottom: "8px" }}>
-                  <div style={{ color: "#f8fafc" }}><strong>{log.user}</strong> - {log.type}</div>
-                  <div style={{ color: "#94a3b8", fontSize: "0.85rem" }}>{new Date(log.timestamp).toLocaleString()}</div>
-                  <div style={{ color: "#cbd5e1", marginTop: "4px" }}>{log.details}</div>
-                </div>
+                <LogEntry key={log.id}>
+                  <div style={{ color: adminTheme.text, fontWeight: 600 }}>
+                    <strong>{log.user}</strong> - {log.type}
+                  </div>
+                  <div style={{ color: adminTheme.textMuted, fontSize: "0.85rem" }}>
+                    {new Date(log.timestamp).toLocaleString()}
+                  </div>
+                  <div style={{ color: adminTheme.text, marginTop: "4px", fontSize: "0.9rem" }}>
+                    {log.details}
+                  </div>
+                </LogEntry>
               ))
             )}
-          </div>
-        </div>
-      </div>
-    </div>
+          </LogContainer>
+        </AdminCard>
+      </AdminPageLayout>
+    </>
   )
 }
 

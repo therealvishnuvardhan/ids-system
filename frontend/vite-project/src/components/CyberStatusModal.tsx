@@ -5,6 +5,7 @@ type CyberStatusModalProps = {
   message: string
   onClose: () => void
   duration?: number
+  variant?: "admin" | "danger"
 }
 
 const Overlay = styled.div`
@@ -23,14 +24,17 @@ const Overlay = styled.div`
   }
 `
 
-const Card = styled.div`
-  --primary: #00f2ea;
-  --secondary: #a855f7;
-  --bg: #0d0d0d;
+const Card = styled.div<{ $variant?: "admin" | "danger" }>`
+  --primary: ${(p) => (p.$variant === "admin" ? "#a78bfa" : p.$variant === "danger" ? "#ef4444" : "#00f2ea")};
+  --secondary: ${(p) => (p.$variant === "admin" ? "#7c3aed" : p.$variant === "danger" ? "#f59e0b" : "#a855f7")};
+  --bg: ${(p) => (p.$variant === "admin" ? "#0a0612" : p.$variant === "danger" ? "#1f0411" : "#0d0d0d")};
+  --border: ${(p) => (p.$variant === "admin" ? "rgba(124, 58, 237, 0.4)" : p.$variant === "danger" ? "rgba(239, 68, 68, 0.5)" : "rgba(0, 242, 234, 0.3)")};
+  --glow: ${(p) => (p.$variant === "admin" ? "rgba(124, 58, 237, 0.25)" : p.$variant === "danger" ? "rgba(239, 68, 68, 0.3)" : "rgba(0, 242, 234, 0.2)")};
+  --textGlow: ${(p) => (p.$variant === "admin" ? "rgba(167, 139, 250, 0.5)" : p.$variant === "danger" ? "rgba(239, 68, 68, 0.55)" : "rgba(0, 242, 234, 0.4)")};
   font-family: "Orbitron", "Fira Code", Consolas, monospace;
   background: var(--bg);
-  border: 1px solid rgba(0, 242, 234, 0.3);
-  box-shadow: 0 0 30px rgba(0, 242, 234, 0.2), inset 0 0 15px rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border);
+  box-shadow: 0 0 30px var(--glow), inset 0 0 15px rgba(0, 0, 0, 0.5);
   padding: 2rem 2.5rem;
   min-width: 320px;
   text-align: center;
@@ -48,7 +52,7 @@ const StatusText = styled.div`
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.2em;
-  text-shadow: 0 0 15px rgba(0, 242, 234, 0.4);
+  text-shadow: 0 0 15px var(--textGlow);
 `
 
 const GlitchText = styled.span`
@@ -100,7 +104,7 @@ const GlitchText = styled.span`
   }
 `
 
-function CyberStatusModal({ message, onClose, duration = 1800 }: CyberStatusModalProps) {
+function CyberStatusModal({ message, onClose, duration = 1800, variant }: CyberStatusModalProps) {
   useEffect(() => {
     const t = setTimeout(onClose, duration)
     return () => clearTimeout(t)
@@ -108,7 +112,7 @@ function CyberStatusModal({ message, onClose, duration = 1800 }: CyberStatusModa
 
   return (
     <Overlay onClick={onClose}>
-      <Card onClick={(e) => e.stopPropagation()}>
+      <Card $variant={variant} onClick={(e) => e.stopPropagation()}>
         <StatusText>
           <GlitchText data-text={message}>{message}</GlitchText>
         </StatusText>

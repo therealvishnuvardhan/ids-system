@@ -1,0 +1,59 @@
+/* Admin Circuit Background - Dark purple tech vibe */
+.circuit-bg-container {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+.circuit-bg-container .circuit-svg {
+  opacity: 0.35;
+  overflow: visible;
+}
+
+.circuit-svg {
+  opacity: 0.35;
+  overflow: visible;
+}
+
+.circuit-svg path {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.circuit-not-animated1 {
+  stroke: rgba(124, 58, 237, 0.15);
+}
+
+.circuit-not-animated2 {
+  stroke: rgba(167, 139, 250, 0.08);
+}
+
+.circuit-animated {
+  stroke: #7c3aed;
+  stroke-width: 2;
+  stroke-dasharray: 50 400;
+  animation: circuit-flow var(--timing, 6s) linear infinite;
+  animation-delay: calc(var(--start-dist, 0) * -80ms);
+}
+
+@keyframes circuit-flow {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -450;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .circuit-animated {
+    animation: none;
+    stroke: rgba(124, 58, 237, 0.4);
+  }
+}

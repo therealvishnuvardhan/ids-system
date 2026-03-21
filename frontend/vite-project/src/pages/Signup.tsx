@@ -9,7 +9,7 @@ function Signup() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
-  const [statusModal, setStatusModal] = useState(false)
+  const [statusModal, setStatusModal] = useState<{ message: string; variant?: "danger" | "admin"; path?: string } | null>(null)
   const navigate = useNavigate()
 
   async function handleSignup(e: React.FormEvent) {
@@ -31,14 +31,20 @@ function Signup() {
     ensureAppData()
     const config = getConfig()
     if (!config.allowSignup) {
-      alert("Signup is currently disabled by admin")
+      setStatusModal({
+        message: "☠️ Signup Access Denied by Admin. Protocol halted. ☠️",
+        variant: "danger"
+      })
       setLoading(false)
       return
     }
 
     const users = getUsers()
     if (users.length >= config.maxUsers) {
-      alert("User limit reached. Contact admin.")
+      setStatusModal({
+        message: "☠️ User limit reached. Contact admin before re-attempt. ☠️",
+        variant: "danger"
+      })
       setLoading(false)
       return
     }
@@ -46,7 +52,10 @@ function Signup() {
     const existing = users.find(u => u.username === username)
 
     if (existing) {
-      alert("Username already exists")
+      setStatusModal({
+        message: "☠️ Username already exists. Pick another alias. ☠️",
+        variant: "danger"
+      })
       setLoading(false)
       return
     }
@@ -67,7 +76,7 @@ function Signup() {
     setLoggedInUser(username, "user")
 
     setLoading(false)
-    setStatusModal(true)
+    setStatusModal({ message: "✅ Credentials Passed — Welcome to the system", variant: "admin", path: "/dashboard" })
   }
 
   return (
@@ -75,10 +84,16 @@ function Signup() {
       <CyberPattern />
       {statusModal && (
         <CyberStatusModal
-          message="Credentials Passed"
+          message={statusModal.message}
+          variant={statusModal.variant}
           onClose={() => {
-            setStatusModal(false)
-            navigate("/dashboard")
+            if (statusModal?.path) {
+              const nextPath = statusModal.path
+              setStatusModal(null)
+              navigate(nextPath)
+              return
+            }
+            setStatusModal(null)
           }}
         />
       )}

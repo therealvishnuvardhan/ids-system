@@ -1,68 +1,101 @@
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate, useLocation } from "react-router-dom"
 import { useState } from "react"
 import styled from "styled-components"
 import { logoutCurrentSession } from "../utils/authUtils"
 import { adminTheme } from "../adminTheme"
-import CyberStatusModal from "./CyberStatusModal"
 
-const Nav = styled.nav`
-  position: relative;
-  z-index: 10;
-  background: rgba(5, 5, 8, 0.95);
-  border-bottom: 1px solid ${adminTheme.border};
-  padding: 12px 24px;
+const Sidebar = styled.aside`
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 240px;
+  height: 100vh;
+  z-index: 100;
+  background: rgba(15, 8, 24, 0.97);
+  border-right: 1px solid ${adminTheme.border};
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  backdrop-filter: blur(8px);
+  flex-direction: column;
+  backdrop-filter: blur(12px);
 `
 
-const Brand = styled.span`
-  color: ${adminTheme.primary};
+const Brand = styled.div`
+  padding: 1.5rem 1.25rem;
+  border-bottom: 1px solid ${adminTheme.border};
   font-family: ${adminTheme.fontDisplay};
   font-weight: 700;
-  font-size: 1.1rem;
-  letter-spacing: 0.1em;
-  margin-right: 24px;
+  font-size: 0.95rem;
+  letter-spacing: 0.15em;
+  color: ${adminTheme.primary};
+  text-transform: uppercase;
 `
 
-const Links = styled.div`
+const NavLinks = styled.nav`
+  flex: 1;
+  padding: 1rem 0;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
 `
 
-const NavLink = styled(Link)`
-  color: ${adminTheme.textMuted};
+const NavLink = styled(Link)<{ $active?: boolean }>`
+  display: block;
+  padding: 0.85rem 1.25rem;
+  margin: 0 0.75rem;
+  color: ${(p) => (p.$active ? adminTheme.primary : adminTheme.textMuted)};
   text-decoration: none;
   font-family: ${adminTheme.fontMono};
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  padding: 8px 12px;
-  border-radius: 4px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   transition: all 0.2s;
+  border-left: 2px solid ${(p) => (p.$active ? adminTheme.primary : "transparent")};
+  background: ${(p) => (p.$active ? `rgba(124, 58, 237, 0.12)` : "transparent")};
+
   &:hover {
     color: ${adminTheme.primary};
-    background: rgba(249, 115, 22, 0.1);
+    background: rgba(124, 58, 237, 0.08);
   }
 `
 
-const LogoutBtn = styled.button`
-  background: ${adminTheme.accent};
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 16px;
+const ShutDownBtn = styled.button`
+  margin: 1rem 1rem 1.5rem;
+  padding: 0.9rem 1.25rem;
+  background: transparent;
+  border: 1px solid ${adminTheme.danger};
+  color: ${adminTheme.danger};
   font-family: ${adminTheme.fontMono};
+  font-size: 0.8rem;
   font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.25s;
+
   &:hover {
-    background: #dc2626;
-    box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+    background: ${adminTheme.danger};
+    color: #fff;
+    box-shadow: 0 0 20px rgba(220, 38, 38, 0.3);
   }
+`
+
+const ShutdownOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  color: ${adminTheme.primary};
+  font-family: ${adminTheme.fontDisplay};
+  font-size: 2rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
 `
 
 const Overlay = styled.div`
@@ -141,8 +174,17 @@ const ConfirmButton = styled.button<{ $variant: 'yes' | 'no' }>`
   }
 `
 
+const links = [
+  { to: "/admin", label: "Home" },
+  { to: "/admin/dashboard", label: "Dashboard" },
+  { to: "/admin/config", label: "Config" },
+  { to: "/admin/audit", label: "Audit" },
+  { to: "/admin/sessions", label: "Sessions" },
+  { to: "/admin/performance", label: "Performance" },
+] as const
+
 function CyberConfirmModal({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
-  console.log("Rendering Admin CyberConfirmModal");
+  console.log("Rendering Admin Sidebar CyberConfirmModal");
   return (
     <Overlay onClick={onCancel}>
       <ConfirmCard onClick={(e) => e.stopPropagation()}>
@@ -160,29 +202,30 @@ function CyberConfirmModal({ onConfirm, onCancel }: { onConfirm: () => void; onC
   )
 }
 
-function AdminNavbar() {
+function AdminSidebar() {
   const navigate = useNavigate()
-  const [showShutdown, setShowShutdown] = useState(false)
+  const location = useLocation()
+  const [isShuttingDown, setIsShuttingDown] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
 
-  const handleLogout = () => {
-    console.log("Admin logout clicked");
+  const handleShutDown = () => {
+    console.log("Admin sidebar shutdown clicked");
     setShowConfirm(true)
   }
 
   const onConfirmShutdown = () => {
+    console.log("Admin sidebar shutdown confirmed");
     setShowConfirm(false)
-    setShowShutdown(true)
+    setIsShuttingDown(true)
+    setTimeout(() => {
+      logoutCurrentSession()
+      navigate("/login")
+    }, 3000) // 3 seconds delay
   }
 
   const onCancelShutdown = () => {
+    console.log("Admin sidebar shutdown cancelled");
     setShowConfirm(false)
-  }
-
-  const onShutdownComplete = () => {
-    setShowShutdown(false)
-    logoutCurrentSession()
-    navigate("/login")
   }
 
   return (
@@ -193,30 +236,20 @@ function AdminNavbar() {
           onCancel={onCancelShutdown}
         />
       )}
-      {showShutdown && (
-        <CyberStatusModal
-          message="System Shutting Down"
-          onClose={onShutdownComplete}
-          duration={1500}
-          variant="admin"
-        />
-      )}
-    <Nav>
-      <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+      <Sidebar>
         <Brand>Admin Portal</Brand>
-        <Links>
-          <NavLink to="/admin">Home</NavLink>
-          <NavLink to="/admin/dashboard">Dashboard</NavLink>
-          <NavLink to="/admin/config">Config</NavLink>
-          <NavLink to="/admin/audit">Audit</NavLink>
-          <NavLink to="/admin/sessions">Sessions</NavLink>
-          <NavLink to="/admin/performance">Performance</NavLink>
-        </Links>
-      </div>
-      <LogoutBtn onClick={handleLogout}>Shut Down</LogoutBtn>
-    </Nav>
+        <NavLinks>
+          {links.map(({ to, label }) => (
+            <NavLink key={to} to={to} $active={location.pathname === to}>
+              {label}
+            </NavLink>
+          ))}
+        </NavLinks>
+        <ShutDownBtn onClick={handleShutDown}>Shut down</ShutDownBtn>
+      </Sidebar>
+      {isShuttingDown && <ShutdownOverlay>System shutting down...</ShutdownOverlay>}
     </>
   )
 }
 
-export default AdminNavbar
+export default AdminSidebar

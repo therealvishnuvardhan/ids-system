@@ -15,6 +15,7 @@ export type AppMetrics = {
 
 export type AppConfig = {
   allowSignup: boolean
+  allowLogin: boolean
   maxUsers: number
 }
 
@@ -43,6 +44,7 @@ const DEFAULT_METRICS: AppMetrics = {
 
 const DEFAULT_CONFIG: AppConfig = {
   allowSignup: true,
+  allowLogin: true,
   maxUsers: 100
 }
 
@@ -73,6 +75,16 @@ export function ensureAppData() {
   const configRaw = localStorage.getItem("appConfig")
   if (!configRaw) {
     localStorage.setItem("appConfig", JSON.stringify(DEFAULT_CONFIG))
+  } else {
+    try {
+      const existingConfig = JSON.parse(configRaw) as Partial<AppConfig>
+      const normalizedConfig = { ...DEFAULT_CONFIG, ...existingConfig }
+      if (JSON.stringify(normalizedConfig) !== JSON.stringify(existingConfig)) {
+        localStorage.setItem("appConfig", JSON.stringify(normalizedConfig))
+      }
+    } catch {
+      localStorage.setItem("appConfig", JSON.stringify(DEFAULT_CONFIG))
+    }
   }
 
   const auditRaw = localStorage.getItem("appAudit")
@@ -110,7 +122,11 @@ export function saveMetrics(metrics: AppMetrics) {
 export function getConfig(): AppConfig {
   ensureAppData()
   try {
-    return JSON.parse(localStorage.getItem("appConfig") || "") as AppConfig
+    const stored = JSON.parse(localStorage.getItem("appConfig") || "") as Partial<AppConfig>
+    return {
+      ...DEFAULT_CONFIG,
+      ...stored
+    }
   } catch {
     return DEFAULT_CONFIG
   }

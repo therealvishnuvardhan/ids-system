@@ -1,43 +1,106 @@
-import AdminNavbar from "../components/AdminNavbar"
+import { useEffect } from "react"
+import { useNavigate } from "react-router-dom"
+import AdminSidebar from "../components/AdminSidebar"
+import AdminPageLayout from "../components/AdminPageLayout"
+import { AdminCard } from "../components/AdminPageStyles"
 import { getMetrics } from "../utils/authUtils"
+import { adminTheme } from "../adminTheme"
+import styled from "styled-components"
 
-function AdminPerformance(){
+const BarRow = styled.div`
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  gap: 12px;
+`
+
+const BarLabel = styled.div`
+  width: 50px;
+  color: ${adminTheme.text};
+  font-family: ${adminTheme.fontMono};
+`
+
+const BarTrack = styled.div`
+  flex: 1;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  overflow: hidden;
+  height: 14px;
+  border: 1px solid rgba(124, 58, 237, 0.3);
+`
+
+const BarFill = styled.div<{ width: number }>`
+  width: ${(p) => p.width}%;
+  background: linear-gradient(90deg, #00d4aa, #00f5d4);
+  height: 100%;
+  border-radius: 6px;
+  box-shadow: 0 0 8px rgba(0, 212, 170, 0.4);
+`
+
+const BarValue = styled.div`
+  width: 50px;
+  color: ${adminTheme.primary};
+  font-family: ${adminTheme.fontMono};
+`
+
+function AdminPerformance() {
+  const navigate = useNavigate()
   const metrics = getMetrics()
   const dayData = [
     { day: "Mon", value: metrics.totalLogins - 3 },
     { day: "Tue", value: metrics.totalLogins - 1 },
     { day: "Wed", value: metrics.totalLogins + 2 },
     { day: "Thu", value: metrics.totalLogins + 5 },
-    { day: "Fri", value: metrics.totalLogins + 3 }
+    { day: "Fri", value: metrics.totalLogins + 3 },
   ]
 
-  return (
-    <div>
-      <AdminNavbar />
-      <div style={{ minHeight: "100vh", padding: "30px", background: "#0b1120", color: "#e2e8f0", display: "flex", justifyContent: "center" as const }}>
-        <div style={{ width: "100%", maxWidth: "1000px" }}>
-          <h1 style={{ color: "#38bdf8" }}>Site Performance</h1>
-          <div style={{ marginTop: "16px", background: "#111827", borderRadius: "10px", padding: "16px", border: "1px solid #334155" }}>
-            <div style={{ marginBottom: "14px" }}><strong>Active Users Today:</strong> {metrics.activeUsers}</div>
-            <div style={{ marginBottom: "14px" }}><strong>Most Active Day:</strong> Friday</div>
-            <div style={{ marginBottom: "14px" }}><strong>Performance Health:</strong> Good</div>
-          </div>
+  useEffect(() => {
+    if (localStorage.getItem("role") !== "admin") {
+      navigate("/login")
+    }
+  }, [navigate])
 
-          <div style={{ background: "#111827", borderRadius: "10px", border: "1px solid #334155", padding: "16px", marginTop: "16px" }}>
-          <h3 style={{ marginBottom: "12px", color: "#cbd5e1" }}>Daily Logins (sample)</h3>
-          {dayData.map((entry) => (
-            <div key={entry.day} style={{ display: "flex", alignItems: "center", marginBottom: "8px" }}>
-              <div style={{ width: "50px", color: "#f8fafc" }}>{entry.day}</div>
-              <div style={{ flex: 1, marginRight: "10px", background: "#1f2937", borderRadius: "5px", overflow: "hidden" }}>
-                <div style={{ width: `${Math.min(100, entry.value * 4)}%`, background: "#22c55e", height: "12px" }} />
-              </div>
-              <div style={{ width: "50px", color: "#cbd5e1" }}>{entry.value}</div>
-            </div>
-          ))}
+  return (
+    <>
+      <AdminSidebar />
+      <AdminPageLayout
+        title="Admin Control Panel"
+        description="View system performance metrics and statistics."
+      >
+        <AdminCard>
+          <h2 style={{ margin: "0 0 16px", color: adminTheme.primary, fontFamily: adminTheme.fontDisplay }}>
+            Site Performance
+          </h2>
+          <div style={{ marginBottom: "14px", color: adminTheme.text }}>
+            <strong>Active Users Today:</strong>{" "}
+            <span style={{ color: adminTheme.primary }}>{metrics.activeUsers}</span>
           </div>
-        </div>
-      </div>
-    </div>
+          <div style={{ marginBottom: "14px", color: adminTheme.text }}>
+            <strong>Most Active Day:</strong>{" "}
+            <span style={{ color: adminTheme.primary }}>Friday</span>
+          </div>
+          <div style={{ marginBottom: "14px", color: adminTheme.text }}>
+            <strong>Performance Health:</strong>{" "}
+            <span style={{ color: adminTheme.success }}>Good</span>
+          </div>
+        </AdminCard>
+
+        <AdminCard>
+          <h3 style={{ margin: "0 0 16px", color: adminTheme.primary, fontFamily: adminTheme.fontDisplay }}>
+            Daily Logins (sample)
+          </h3>
+          {dayData.map((entry) => (
+            <BarRow key={entry.day}>
+              <BarLabel>{entry.day}</BarLabel>
+              <BarTrack>
+                <BarFill width={Math.min(100, entry.value * 4)} />
+              </BarTrack>
+              <BarValue>{entry.value}</BarValue>
+            </BarRow>
+          ))}
+        </AdminCard>
+      </AdminPageLayout>
+    </>
   )
 }
 
