@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LabelList } from "recharts"
 import UserPageLayout from "../components/UserPageLayout"
 import styled from "styled-components"
 import { cyberTheme } from "../theme"
@@ -107,6 +107,99 @@ const tooltipStyle = {
   fontFamily: cyberTheme.fontMono,
 }
 
+const ModelComparisonTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload || payload.length === 0) return null
+
+  // Prefer the bar series entry (dataKey="accuracy")
+  const accuracyEntry =
+    payload.find((p: any) => p?.dataKey === "accuracy" && p?.value !== undefined) ??
+    payload.find((p: any) => p?.value !== undefined) ??
+    payload[0]
+
+  const rawValue =
+    accuracyEntry?.value ??
+    accuracyEntry?.payload?.accuracy ??
+    payload.find((p: any) => p?.payload?.accuracy !== undefined)?.payload?.accuracy ??
+    0
+
+  // If value already includes '%' (string), strip it before Number conversion.
+  const cleaned =
+    typeof rawValue === "string" ? rawValue.replace("%", "").trim() : rawValue
+
+  const n = Number(cleaned)
+  const formatted = Number.isFinite(n) ? `${n.toFixed(2)}%` : `${rawValue}%`
+  const color =
+    accuracyEntry?.color ??
+    accuracyEntry?.payload?.color ??
+    CHART_COLORS.find((c: string) => c) ??
+    cyberTheme.primary
+
+  return (
+    <div
+      style={{
+        backgroundColor: "rgba(10, 10, 10, 0.92)",
+        border: `1px solid ${cyberTheme.border}`,
+        color: cyberTheme.text,
+        fontFamily: cyberTheme.fontMono,
+        padding: "10px 12px",
+        borderRadius: 8,
+        boxShadow: "0 0 35px rgba(0, 242, 234, 0.25)",
+        zIndex: 99999,
+        pointerEvents: "none",
+        minWidth: 170,
+      }}
+    >
+      <div
+        style={{
+          color: cyberTheme.textMuted,
+          fontWeight: 800,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          fontSize: "0.8rem",
+          marginBottom: 6,
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span
+            style={{
+              width: 10,
+              height: 10,
+              background: color,
+              borderRadius: 2,
+              boxShadow: `0 0 16px ${color}`,
+              display: "inline-block",
+            }}
+          />
+          <span style={{ color: cyberTheme.textMuted, fontWeight: 700 }}>Accuracy</span>
+        </div>
+        <span
+          style={{
+            color: cyberTheme.text,
+            fontWeight: 900,
+            fontSize: "1.15rem",
+            textShadow: "0 0 18px rgba(0, 242, 234, 0.55)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {formatted}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 function Results() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -208,13 +301,24 @@ function Results() {
               <BarChart data={modelComparisonData}>
                 <CartesianGrid strokeDasharray="3 3" stroke={cyberTheme.border} />
                 <XAxis dataKey="name" stroke={cyberTheme.textMuted} />
-                <YAxis domain={["auto", 100]} stroke={cyberTheme.textMuted} tickFormatter={(v) => `${v}%`} />
-                <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: any) => [`${Number(v ?? 0).toFixed(2)}%`, "Accuracy"]} />
+                <YAxis domain={[0, 100]} stroke={cyberTheme.textMuted} tickFormatter={(v) => `${v}%`} />
+                <RechartsTooltip content={ModelComparisonTooltip} />
                 <Legend />
                 <Bar dataKey="accuracy" name="Accuracy %">
                   {modelComparisonData.map((_: any, i: number) => (
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
+                  <LabelList
+                    dataKey="accuracy"
+                    position="top"
+                    formatter={(v: any) => `${Number(v ?? 0).toFixed(2)}%`}
+                    style={{
+                      fill: cyberTheme.text,
+                      fontFamily: cyberTheme.fontMono,
+                      fontWeight: 800,
+                      textShadow: "0 0 16px rgba(0, 242, 234, 0.55)",
+                    }}
+                  />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>

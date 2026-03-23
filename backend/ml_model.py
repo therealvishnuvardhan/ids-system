@@ -5,7 +5,6 @@ import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 rf_model = joblib.load(os.path.join(BASE_DIR, "rf_model.pkl"))
 svm_model = joblib.load(os.path.join(BASE_DIR, "svm_model.pkl"))
-encoders = joblib.load(os.path.join(BASE_DIR, "encoders.pkl"))
 label_encoder = joblib.load(os.path.join(BASE_DIR, "label_encoder.pkl"))
 
 attack_category_map = {
@@ -67,23 +66,24 @@ def predict_network(data_dict):
 
     df = pd.DataFrame([data_dict])
 
-    # fill missing expected features with zeros
+    categorical_cols = ["protocol_type", "service", "flag"]
+    numerical_cols = [c for c in selected_features if c not in categorical_cols]
+
+    # fill missing expected features with safe defaults
     for f in selected_features:
         if f not in df.columns:
-            df[f] = 0.0
+            df[f] = "unknown" if f in categorical_cols else 0.0
 
     # Only keep expected order
     df = df[selected_features]
 
-    # encode categories
-    for col in ["protocol_type", "service", "flag"]:
-        if col in df.columns and col in encoders:
-            try:
-                df[col] = encoders[col].transform(df[col].astype(str))
-            except ValueError:
-                df[col] = 0.0
-        else:
-            df[col] = 0.0
+    # Normalize dtypes to match OneHot pipeline training:
+    for col in categorical_cols:
+        if col in df.columns:
+            df[col] = df[col].fillna("unknown").astype(str)
+    for col in numerical_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
 
     svm_pred = svm_model.predict(df)
 

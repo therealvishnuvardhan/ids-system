@@ -150,6 +150,7 @@ function Upload() {
       })
 
       const data = await response.json()
+      console.log("Upload response:", data)
 
       if (!response.ok || data.error) {
         throw new Error(data.error || "Upload failed")

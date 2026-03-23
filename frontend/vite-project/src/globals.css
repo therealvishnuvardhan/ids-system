@@ -553,21 +553,29 @@ body::before {
 
 /* ===== GLOBAL SCROLLBAR ===== */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-tertiary);
+  background: var(--bg-secondary);
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 4px;
+  background: var(--primary-color);
+  border-radius: 3px;
+  box-shadow: 0 0 6px var(--primary-glow), inset 0 0 6px rgba(74, 255, 74, 0.3);
+  border: 1px solid var(--bg-primary);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--border-hover);
+  background: var(--primary-glow);
+  box-shadow: 0 0 10px var(--primary-glow), inset 0 0 10px rgba(255, 255, 255, 0.2);
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--bg-secondary);
 }
 
 /* ===== GLOBAL RESPONSIVE DESIGN ===== */

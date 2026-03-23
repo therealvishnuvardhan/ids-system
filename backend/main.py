@@ -25,7 +25,6 @@ app.add_middleware(
 
 rf_model = joblib.load(os.path.join(BASE_DIR, "rf_model.pkl"))
 svm_model = joblib.load(os.path.join(BASE_DIR, "svm_model.pkl"))
-encoders = joblib.load(os.path.join(BASE_DIR, "encoders.pkl"))
 label_encoder = joblib.load(os.path.join(BASE_DIR, "label_encoder.pkl"))
 
 # -------------------------
@@ -43,6 +42,9 @@ selected_features = [
     "dst_host_srv_rerror_rate"
 ]
 
+categorical_cols = ["protocol_type", "service", "flag"]
+numerical_cols = [c for c in selected_features if c not in categorical_cols]
+
 # -------------------------
 # CSV Upload API
 # -------------------------
@@ -58,23 +60,23 @@ async def upload_csv(file: UploadFile = File(...)):
         before_val_counts = df["protocol_type"].value_counts().to_dict()
         before_validation_data = [{"name": str(k), "value": int(v)} for k, v in before_val_counts.items()]
 
-        # Add missing features as 0 (for abbreviated uploads like intrusion_dataset.csv)
+        # Add missing features with safe defaults
         for f in selected_features:
             if f not in df.columns:
-                df[f] = 0.0
+                df[f] = "unknown" if f in categorical_cols else 0.0
 
         # Keep only required columns
         df = df[selected_features]
 
-        # Encode categorical
-        for col in ["protocol_type", "service", "flag"]:
-            if col in df.columns and col in encoders:
-                try:
-                    df[col] = encoders[col].transform(df[col].astype(str))
-                except ValueError:
-                    df[col] = 0.0 # fallback if unknown
-            else:
-                df[col] = 0.0
+        # Normalize dtypes to match OneHot pipeline training:
+        # - categorical: strings
+        # - numeric: float
+        for col in categorical_cols:
+            if col in df.columns:
+                df[col] = df[col].fillna("unknown").astype(str)
+        for col in numerical_cols:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
 
         # -------------------------
         # SVM Prediction (binary)

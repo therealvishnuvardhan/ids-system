@@ -29,12 +29,13 @@ const BarTrack = styled.div`
   border: 1px solid rgba(124, 58, 237, 0.3);
 `
 
-const BarFill = styled.div<{ width: number }>`
+const BarFill = styled.div<{ width: number; gradient: string; shadow: string }>`
   width: ${(p) => p.width}%;
-  background: linear-gradient(90deg, #00d4aa, #00f5d4);
+  background: ${(p) => p.gradient};
   height: 100%;
   border-radius: 6px;
-  box-shadow: 0 0 8px rgba(0, 212, 170, 0.4);
+  box-shadow: 0 0 8px ${(p) => p.shadow};
+  transition: width 0.4s ease;
 `
 
 const BarValue = styled.div`
@@ -42,6 +43,14 @@ const BarValue = styled.div`
   color: ${adminTheme.primary};
   font-family: ${adminTheme.fontMono};
 `
+
+const BAR_COLORS = [
+  { gradient: "linear-gradient(90deg, #00d4aa, #00f5d4)", shadow: "rgba(0, 212, 170, 0.4)" },
+  { gradient: "linear-gradient(90deg, #7c3aed, #a78bfa)", shadow: "rgba(124, 58, 237, 0.4)" },
+  { gradient: "linear-gradient(90deg, #f59e0b, #fcd34d)", shadow: "rgba(245, 158, 11, 0.4)" },
+  { gradient: "linear-gradient(90deg, #ef4444, #f87171)", shadow: "rgba(239, 68, 68, 0.4)" },
+  { gradient: "linear-gradient(90deg, #3b82f6, #93c5fd)", shadow: "rgba(59, 130, 246, 0.4)" },
+]
 
 function AdminPerformance() {
   const navigate = useNavigate()
@@ -53,6 +62,8 @@ function AdminPerformance() {
     { day: "Thu", value: metrics.totalLogins + 5 },
     { day: "Fri", value: metrics.totalLogins + 3 },
   ]
+
+  const maxValue = Math.max(...dayData.map((d) => d.value))
 
   useEffect(() => {
     if (localStorage.getItem("role") !== "admin") {
@@ -87,13 +98,17 @@ function AdminPerformance() {
 
         <AdminCard>
           <h3 style={{ margin: "0 0 16px", color: adminTheme.primary, fontFamily: adminTheme.fontDisplay }}>
-            Daily Logins (sample)
+            Daily Logins
           </h3>
-          {dayData.map((entry) => (
+          {dayData.map((entry, i) => (
             <BarRow key={entry.day}>
               <BarLabel>{entry.day}</BarLabel>
               <BarTrack>
-                <BarFill width={Math.min(100, entry.value * 4)} />
+                <BarFill
+                  width={Math.round((entry.value / maxValue) * 100)}
+                  gradient={BAR_COLORS[i].gradient}
+                  shadow={BAR_COLORS[i].shadow}
+                />
               </BarTrack>
               <BarValue>{entry.value}</BarValue>
             </BarRow>
