@@ -1,34 +1,27 @@
-import joblib
+import joblib  # reloaded: 2026-03-25
 import pandas as pd
 import numpy as np
 import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Load model & artifacts
+# Load both models
+svm_model       = joblib.load(os.path.join(BASE_DIR, "svm_model.pkl"))
 xgb_model       = joblib.load(os.path.join(BASE_DIR, "xgb_model.pkl"))
 label_encoder   = joblib.load(os.path.join(BASE_DIR, "label_encoder.pkl"))   # 5-class
 scaler          = joblib.load(os.path.join(BASE_DIR, "scaler.pkl"))
 feature_columns = joblib.load(os.path.join(BASE_DIR, "feature_columns.pkl"))
 
-# Category display mapping
-attack_to_cat = {
-    "neptune":"DoS","smurf":"DoS","back":"DoS","teardrop":"DoS",
-    "pod":"DoS","land":"DoS","apache2":"DoS","udpstorm":"DoS",
-    "processtable":"DoS","mailbomb":"DoS","worm":"DoS",
-    "ipsweep":"Probe","nmap":"Probe","portsweep":"Probe",
-    "satan":"Probe","saint":"Probe","mscan":"Probe",
-    "guess_passwd":"R2L","ftp_write":"R2L","imap":"R2L",
-    "phf":"R2L","multihop":"R2L","warezclient":"R2L",
-    "warezmaster":"R2L","sendmail":"R2L","named":"R2L",
-    "snmpgetattack":"R2L","snmpguess":"R2L","xlock":"R2L",
-    "xsnoop":"R2L","httptunnel":"R2L","spy":"R2L",
-    "buffer_overflow":"U2R","loadmodule":"U2R","rootkit":"U2R",
-    "perl":"U2R","sqlattack":"U2R","xterm":"U2R","ps":"U2R",
+# Category display names
+cat_display = {
+    "dos":   "DoS",
+    "probe": "Probe",
+    "r2l":   "R2L",
+    "u2r":   "U2R",
     "normal":"Normal"
 }
 
-# Representative attack name per category
+# Representative attack per category (for display)
 cat_representative = {
     "dos":   "neptune",
     "probe": "ipsweep",
@@ -36,11 +29,11 @@ cat_representative = {
     "u2r":   "buffer_overflow",
 }
 
-attack_category_map = attack_to_cat  # used by main.py
+attack_category_map = cat_display   # used by main.py
 
 
 def get_risk_level(category: str, confidence: float) -> str:
-    if category == "Normal":
+    if category in ("Normal", "normal"):
         return "Low"
     if confidence > 90:
         return "High"
@@ -50,7 +43,7 @@ def get_risk_level(category: str, confidence: float) -> str:
 
 
 def _build_row(data_dict: dict) -> pd.DataFrame:
-    """Build an OHE-aligned feature row for inference."""
+    """Build an OHE-aligned single-row DataFrame for inference."""
     categorical_cols = ["protocol_type", "service", "flag"]
     numerical_features = [
         "duration","src_bytes","dst_bytes","land","wrong_fragment","urgent","hot",
@@ -69,7 +62,7 @@ def _build_row(data_dict: dict) -> pd.DataFrame:
     for col in numerical_features:
         row[col] = float(data_dict.get(col, 0.0))
     for cat in categorical_cols:
-        val = str(data_dict.get(cat, "unknown")).lower()
+        val = str(data_dict.get(cat, "unknown"))   # no .lower() — match training case
         row[f"{cat}_{val}"] = 1.0
 
     df = pd.DataFrame([row])
@@ -78,34 +71,39 @@ def _build_row(data_dict: dict) -> pd.DataFrame:
 
 
 def predict_network(data_dict: dict) -> dict:
-    """Single XGBoost binary model: Normal vs Attack."""
-    df = _build_row(data_dict)
+    """
+    Two-model pipeline:
+      SVM  → binary: Normal vs Attack
+      XGBoost → 5-class: dos / probe / r2l / u2r / normal
+    """
+    df        = _build_row(data_dict)
     df_scaled = scaler.transform(df)
 
-    pred     = int(xgb_model.predict(df_scaled)[0])        # 0=Normal, 1=Attack
-    proba    = xgb_model.predict_proba(df_scaled)[0]
-    conf     = round(float(max(proba)) * 100, 2)
+    # Stage 1: SVM binary
+    svm_pred  = int(svm_model.predict(df_scaled)[0])
+    svm_proba = svm_model.predict_proba(df_scaled)[0]
+    svm_conf  = round(float(max(svm_proba)) * 100, 2)
 
-    if pred == 0:
+    if svm_pred == 0:
         return {
             "status":                "Normal Traffic",
             "attack_type":           "normal",
             "attack_category":       "Normal",
             "risk_level":            "Low",
-            "confidence_percentage": conf
+            "confidence_percentage": svm_conf
         }
 
-    # For attack: map to category using probabilities
-    # XGBoost is binary — pick a representative type based on features
-    # (simple heuristic: use the feature-based category map)
-    category    = "DoS"          # default — model will show category from batch
-    attack_type = "neptune"
-    risk_level  = get_risk_level(category, conf)
+    # Stage 2: XGBoost 5-class categorizer
+    xgb_pred    = int(xgb_model.predict(df_scaled)[0])
+    cat_label   = label_encoder.inverse_transform([xgb_pred])[0]   # dos/probe/r2l/u2r/normal
+    cat_display_name = cat_display.get(cat_label, "DoS")
+    attack_type = cat_representative.get(cat_label, "neptune")
+    risk_level  = get_risk_level(cat_label, svm_conf)
 
     return {
         "status":                "Attack Detected",
         "attack_type":           attack_type,
-        "attack_category":       category,
+        "attack_category":       cat_display_name,
         "risk_level":            risk_level,
-        "confidence_percentage": conf
+        "confidence_percentage": svm_conf
     }

@@ -8,9 +8,9 @@ import os
 
 from fastapi.middleware.cors import CORSMiddleware
 from ml_model import (
-    xgb_model, scaler, label_encoder,
-    feature_columns, attack_category_map, get_risk_level,
-    cat_representative
+    svm_model, xgb_model, scaler,
+    label_encoder, feature_columns,
+    cat_display, cat_representative, get_risk_level
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -46,8 +46,10 @@ numerical_cols   = [c for c in ALL_COLUMNS if c not in categorical_cols]
 
 
 def _batch_predict(df: pd.DataFrame):
-    """Build OHE features and run XGBoost on all rows at once."""
-
+    """
+    Build OHE features and run both models on every row.
+    Returns: svm_preds, xgb_preds, svm_probas
+    """
     # Numerical
     num_data = df[[c for c in numerical_cols if c in df.columns]].copy()
     for col in num_data.columns:
@@ -56,20 +58,22 @@ def _batch_predict(df: pd.DataFrame):
     # OHE categorical columns
     cat_data = pd.DataFrame(index=df.index)
     for cat in categorical_cols:
-        vals = df[cat].fillna("unknown").astype(str).str.lower() if cat in df.columns \
+        vals = df[cat].fillna("unknown").astype(str) if cat in df.columns \
                else pd.Series(["unknown"] * len(df))
         for val in vals.unique():
             cat_data[f"{cat}_{val}"] = (vals == val).astype(float)
 
-    # Align to training feature columns
+    # Align to training columns
     combined = pd.concat([num_data, cat_data], axis=1)
     combined = combined.reindex(columns=feature_columns, fill_value=0).astype(float)
 
     X_scaled = scaler.transform(combined)
-    preds    = xgb_model.predict(X_scaled)           # 0=Normal, 1=Attack
-    probas   = xgb_model.predict_proba(X_scaled)     # [[P(N), P(A)], ...]
 
-    return preds, probas
+    svm_preds  = svm_model.predict(X_scaled)           # binary: 0/1
+    svm_probas = svm_model.predict_proba(X_scaled)     # [[P(N), P(A)], ...]
+    xgb_preds  = xgb_model.predict(X_scaled)           # 5-class index
+
+    return svm_preds, xgb_preds, svm_probas
 
 
 # ─────────────────────────────────
@@ -84,7 +88,7 @@ async def upload_csv(file: UploadFile = File(...)):
 
         # Handle headerless NSL-KDD format
         if "protocol_type" not in raw.columns:
-            cols_full = ALL_COLUMNS + ["label", "difficulty"]
+            cols_full    = ALL_COLUMNS + ["label", "difficulty"]
             cols_nolabel = ALL_COLUMNS + ["label"]
             if len(raw.columns) == len(cols_full):
                 raw.columns = cols_full
@@ -109,20 +113,15 @@ async def upload_csv(file: UploadFile = File(...)):
 
         df = raw[ALL_COLUMNS].copy()
 
-        # Run batch prediction
-        preds, probas = _batch_predict(df)
+        # Run SVM + XGBoost on all rows
+        svm_preds, xgb_preds, svm_probas = _batch_predict(df)
 
         predictions      = []
         after_val_counts = {}
 
-        # Simple attack-category heuristic from features (since model is binary)
-        serror = pd.to_numeric(df.get("serror_rate", 0), errors="coerce").fillna(0)
-        rerror = pd.to_numeric(df.get("rerror_rate",  0), errors="coerce").fillna(0)
-        count  = pd.to_numeric(df.get("count",         0), errors="coerce").fillna(0)
-
         for i in range(len(df)):
-            is_attack = int(preds[i]) == 1
-            conf      = round(float(max(probas[i])) * 100, 2)
+            is_attack = int(svm_preds[i]) == 1
+            conf      = round(float(max(svm_probas[i])) * 100, 2)
 
             if not is_attack:
                 status      = "Normal Traffic"
@@ -130,20 +129,12 @@ async def upload_csv(file: UploadFile = File(...)):
                 category    = "Normal"
                 risk_level  = "Low"
             else:
-                # Categorize based on simple feature heuristics
-                if serror.iloc[i] > 0.5:
-                    cat_key  = "dos"
-                elif rerror.iloc[i] > 0.5:
-                    cat_key  = "probe"
-                elif count.iloc[i] < 5:
-                    cat_key  = "r2l"
-                else:
-                    cat_key  = "dos"
-
-                cat_display = {"dos":"DoS","probe":"Probe","r2l":"R2L","u2r":"U2R"}
-                category    = cat_display.get(cat_key, "DoS")
-                attack_type = cat_representative.get(cat_key, "neptune")
-                risk_level  = get_risk_level(category, conf)
+                # XGBoost gives attack category
+                cat_idx   = int(xgb_preds[i])
+                cat_label = label_encoder.inverse_transform([cat_idx])[0]
+                category  = cat_display.get(cat_label, "DoS")
+                attack_type = cat_representative.get(cat_label, "neptune")
+                risk_level  = get_risk_level(cat_label, conf)
                 status      = "Attack Detected"
 
             after_val_counts[category] = after_val_counts.get(category, 0) + 1
@@ -155,7 +146,7 @@ async def upload_csv(file: UploadFile = File(...)):
                 "confidence_percentage": conf
             })
 
-        # Metrics + confusion matrix
+        # Metrics
         with open(os.path.join(BASE_DIR, "metrics.json")) as f:
             metrics = json.load(f)
 

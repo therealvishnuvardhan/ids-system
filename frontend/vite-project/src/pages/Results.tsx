@@ -200,6 +200,129 @@ const ModelComparisonTooltip = ({ active, payload, label }: any) => {
   )
 }
 
+// ── extra styled components ──────────────────────────────────
+const MetricsGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  @media (max-width: 700px) { grid-template-columns: 1fr; }
+`
+
+const MetricsCard = styled.div<{ $accent: string }>`
+  border: 1px solid ${p => p.$accent}55;
+  background: rgba(0,0,0,0.45);
+  padding: 1.25rem 1.5rem;
+  backdrop-filter: blur(6px);
+`
+
+const MetricsCardTitle = styled.div<{ $accent: string }>`
+  font-family: ${cyberTheme.fontDisplay};
+  font-size: 0.78rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: ${p => p.$accent};
+  margin-bottom: 1rem;
+  border-bottom: 1px solid ${p => p.$accent}44;
+  padding-bottom: 0.5rem;
+`
+
+const MetricsTable = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  font-family: ${cyberTheme.fontMono};
+  font-size: 0.82rem;
+`
+
+const MTh = styled.th<{ $accent: string }>`
+  padding: 0.4rem 0.75rem;
+  text-align: left;
+  color: ${p => p.$accent};
+  font-weight: 700;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid ${p => p.$accent}33;
+`
+
+const MTd = styled.td`
+  padding: 0.4rem 0.75rem;
+  color: ${cyberTheme.text};
+  border-bottom: 1px solid ${cyberTheme.border}55;
+`
+
+const ValueBar = styled.div<{ $pct: number; $accent: string }>`
+  height: 5px;
+  width: 100%;
+  background: ${cyberTheme.border}55;
+  border-radius: 3px;
+  margin-top: 3px;
+  overflow: hidden;
+  &::after {
+    content: '';
+    display: block;
+    height: 100%;
+    width: ${p => p.$pct}%;
+    background: ${p => p.$accent};
+    border-radius: 3px;
+    box-shadow: 0 0 6px ${p => p.$accent};
+  }
+`
+
+const CmWrapper = styled.div`
+  margin-bottom: 1.5rem;
+  border: 1px solid ${cyberTheme.border};
+  background: rgba(0,0,0,0.45);
+  padding: 1.25rem 1.5rem;
+`
+
+const CmGrid = styled.div`
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  grid-template-rows: auto 1fr 1fr;
+  gap: 6px;
+  max-width: 480px;
+  margin: 0 auto;
+`
+
+const CmHeaderCell = styled.div<{ $color?: string }>`
+  font-family: ${cyberTheme.fontMono};
+  font-size: 0.7rem;
+  color: ${p => p.$color || cyberTheme.textMuted};
+  text-align: center;
+  padding: 4px 6px;
+  letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`
+
+const CmCell = styled.div<{ $intensity: number; $color: string }>`
+  background: ${p => p.$color}${p => Math.round(p.$intensity * 200 + 20).toString(16).padStart(2,'0')};
+  border: 1px solid ${p => p.$color}44;
+  border-radius: 6px;
+  padding: 1rem;
+  text-align: center;
+  font-family: ${cyberTheme.fontMono};
+  transition: transform 0.15s;
+  &:hover { transform: scale(1.03); }
+`
+
+const CmValue = styled.div`
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: ${cyberTheme.text};
+  font-family: ${cyberTheme.fontDisplay};
+`
+
+const CmLabel = styled.div`
+  font-size: 0.65rem;
+  color: ${cyberTheme.textMuted};
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-top: 4px;
+`
+
+// ── component ─────────────────────────────────────────────────
 function Results() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -207,8 +330,10 @@ function Results() {
   const results = data?.predictions || []
 
   const beforeValidationData = data?.graph_before_validation || []
-  const afterValidationData = data?.graph_after_validation || []
-  const modelComparisonData = data?.graph_svm_vs_rf || []
+  const afterValidationData  = data?.graph_after_validation  || []
+  const modelComparisonData  = data?.graph_svm_vs_rf         || []
+  const metrics              = data?.metrics                 || {}
+  const cm: number[][]       = data?.confusion_matrix        || [[0,0],[0,0]]
 
   if (results.length === 0) {
     return (
@@ -224,21 +349,53 @@ function Results() {
     )
   }
 
-  const attackCount = results.filter((r: any) => r.status === "Attack Detected").length
-  const normalCount = results.length - attackCount
+  const attackCount   = results.filter((r: any) => r.status === "Attack Detected").length
+  const normalCount   = results.length - attackCount
   const avgConfidence = (results.reduce((acc: number, r: any) => acc + r.confidence_percentage, 0) / results.length).toFixed(1)
 
   const getRiskColor = (level: string) => {
-    if (level === "High") return cyberTheme.danger
+    if (level === "High")   return cyberTheme.danger
     if (level === "Medium") return cyberTheme.warning
     return cyberTheme.success
   }
+
+  // Model metrics rows — bars scaled to 80-100% range so small differences are visible
+  const fmt = (v: number | undefined) =>
+    v !== undefined ? `${(v * 100).toFixed(2)}%` : "—"
+  const scaledBar = (v: number) => Math.max(0, Math.min(100, ((v - 80) / 20) * 100))
+
+  const metricColors = {
+    Accuracy:   "#00f2ea",   // primary cyan
+    "F1-Score": "#a855f7",   // secondary purple
+    Precision:  "#10b981",   // emerald green
+    Recall:     "#38bdf8",   // neon sky-blue
+  } as Record<string, string>
+
+  const svmRows = [
+    { label: "Accuracy",  value: metrics.svm_accuracy,  pct: scaledBar((metrics.svm_accuracy  || 0) * 100) },
+    { label: "F1-Score",  value: metrics.svm_f1,         pct: scaledBar((metrics.svm_f1         || 0) * 100) },
+    { label: "Precision", value: metrics.svm_precision,  pct: scaledBar((metrics.svm_precision  || 0) * 100) },
+    { label: "Recall",    value: metrics.svm_recall,     pct: scaledBar((metrics.svm_recall     || 0) * 100) },
+  ]
+
+  const xgbRows = [
+    { label: "Accuracy",  value: metrics.xgb_accuracy ?? metrics.rf_accuracy,            pct: scaledBar(((metrics.xgb_accuracy ?? metrics.rf_accuracy) || 0) * 100) },
+    { label: "F1-Score",  value: metrics.xgb_f1 ?? metrics.rf_f1,                        pct: scaledBar(((metrics.xgb_f1 ?? metrics.rf_f1)             || 0) * 100) },
+    { label: "Precision", value: metrics.xgb_precision ?? metrics.rf_precision,           pct: scaledBar(((metrics.xgb_precision ?? metrics.rf_precision) || 0) * 100) },
+    { label: "Recall",    value: metrics.xgb_recall ?? metrics.rf_recall,                 pct: scaledBar(((metrics.xgb_recall ?? metrics.rf_recall)      || 0) * 100) },
+  ]
+
+  // Confusion matrix values
+  const [[tn, fp], [fn, tp]] = cm.length >= 2 ? cm : [[0,0],[0,0]]
+  const total    = tn + fp + fn + tp
+  const maxVal   = Math.max(tn, fp, fn, tp) || 1
 
   return (
     <UserPageLayout>
       <Card>
         <PageTitle style={{ textAlign: "center", marginBottom: "1.5rem" }}>Analysis Results</PageTitle>
 
+        {/* ── Summary ── */}
         <SummaryGrid>
           <SummaryItem>
             <SummaryLabel>Total Records</SummaryLabel>
@@ -258,6 +415,113 @@ function Results() {
           </SummaryItem>
         </SummaryGrid>
 
+        {/* ── Model Metrics Tables ── */}
+        <MetricsGrid>
+          {/* SVM */}
+          <MetricsCard $accent={cyberTheme.primary}>
+            <MetricsCardTitle $accent={cyberTheme.primary}>
+              Model 1 — SVM&nbsp;&nbsp;|&nbsp;&nbsp;Binary Classifier
+            </MetricsCardTitle>
+            <MetricsTable>
+              <thead>
+                <tr>
+                  <MTh $accent={cyberTheme.primary}>Metric</MTh>
+                  <MTh $accent={cyberTheme.primary}>Value</MTh>
+                  <MTh $accent={cyberTheme.primary} style={{ width: "40%" }}>Bar</MTh>
+                </tr>
+              </thead>
+              <tbody>
+                {svmRows.map(row => (
+                  <tr key={row.label}>
+                    <MTd style={{ color: metricColors[row.label] }}>{row.label}</MTd>
+                    <MTd style={{ color: metricColors[row.label], fontWeight: 700 }}>{fmt(row.value)}</MTd>
+                    <MTd>
+                      <ValueBar $pct={row.pct} $accent={metricColors[row.label]} />
+                    </MTd>
+                  </tr>
+                ))}
+              </tbody>
+            </MetricsTable>
+            <div style={{ marginTop: "0.75rem", fontSize: "0.68rem", color: cyberTheme.textMuted, fontFamily: cyberTheme.fontMono }}>
+              Task: Normal vs Attack (Binary)
+            </div>
+          </MetricsCard>
+
+          {/* XGBoost */}
+          <MetricsCard $accent={cyberTheme.primary}>
+            <MetricsCardTitle $accent={cyberTheme.primary}>
+              Model 2 — XGBoost&nbsp;&nbsp;|&nbsp;&nbsp;5-Class Categorizer
+            </MetricsCardTitle>
+            <MetricsTable>
+              <thead>
+                <tr>
+                  <MTh $accent={cyberTheme.primary}>Metric</MTh>
+                  <MTh $accent={cyberTheme.primary}>Value</MTh>
+                  <MTh $accent={cyberTheme.primary} style={{ width: "40%" }}>Bar</MTh>
+                </tr>
+              </thead>
+              <tbody>
+                {xgbRows.map(row => (
+                  <tr key={row.label}>
+                    <MTd style={{ color: metricColors[row.label] }}>{row.label}</MTd>
+                    <MTd style={{ color: metricColors[row.label], fontWeight: 700 }}>{fmt(row.value)}</MTd>
+                    <MTd>
+                      <ValueBar $pct={row.pct} $accent={metricColors[row.label]} />
+                    </MTd>
+                  </tr>
+                ))}
+              </tbody>
+            </MetricsTable>
+            <div style={{ marginTop: "0.75rem", fontSize: "0.68rem", color: cyberTheme.textMuted, fontFamily: cyberTheme.fontMono }}>
+              Task: DoS / Probe / R2L / U2R / Normal
+            </div>
+          </MetricsCard>
+        </MetricsGrid>
+
+        {/* ── Confusion Matrix ── */}
+        <CmWrapper>
+          <ChartTitle style={{ marginBottom: "0.5rem" }}>
+            Confusion Matrix — SVM Binary (Unseen KDDTest+ Data)
+          </ChartTitle>
+          <p style={{ textAlign:"center", fontSize:"0.72rem", color: cyberTheme.textMuted, fontFamily: cyberTheme.fontMono, marginBottom:"1.25rem" }}>
+            Evaluated on {total.toLocaleString()} samples &nbsp;|&nbsp; 20% KDDTrain+ val&nbsp;+&nbsp;60% KDDTest+ (unseen attacks)
+          </p>
+          <CmGrid>
+            {/* top-left corner */}
+            <CmHeaderCell />
+            {/* column headers */}
+            <CmHeaderCell $color={cyberTheme.success}>Pred: Normal</CmHeaderCell>
+            <CmHeaderCell $color={cyberTheme.danger}>Pred: Attack</CmHeaderCell>
+
+            {/* row 1: Actual Normal */}
+            <CmHeaderCell $color={cyberTheme.success} style={{ flexDirection:"column", gap:2 }}>
+              <span>Actual</span><span>Normal</span>
+            </CmHeaderCell>
+            <CmCell $intensity={tn / maxVal} $color={cyberTheme.success}>
+              <CmValue>{tn.toLocaleString()}</CmValue>
+              <CmLabel>True Negative</CmLabel>
+            </CmCell>
+            <CmCell $intensity={fp / maxVal} $color={cyberTheme.warning}>
+              <CmValue>{fp.toLocaleString()}</CmValue>
+              <CmLabel>False Positive</CmLabel>
+            </CmCell>
+
+            {/* row 2: Actual Attack */}
+            <CmHeaderCell $color={cyberTheme.danger} style={{ flexDirection:"column", gap:2 }}>
+              <span>Actual</span><span>Attack</span>
+            </CmHeaderCell>
+            <CmCell $intensity={fn / maxVal} $color={cyberTheme.warning}>
+              <CmValue>{fn.toLocaleString()}</CmValue>
+              <CmLabel>False Negative</CmLabel>
+            </CmCell>
+            <CmCell $intensity={tp / maxVal} $color={cyberTheme.danger}>
+              <CmValue>{tp.toLocaleString()}</CmValue>
+              <CmLabel>True Positive</CmLabel>
+            </CmCell>
+          </CmGrid>
+        </CmWrapper>
+
+        {/* ── Charts ── */}
         <ChartGrid>
           <ChartContainer>
             <ChartTitle>Traffic Before Validation (Protocols)</ChartTitle>
@@ -265,9 +529,7 @@ function Results() {
               <PieChart>
                 <Pie
                   data={beforeValidationData}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={90}
+                  cx="50%" cy="50%" outerRadius={90}
                   dataKey="value"
                   label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                 >
@@ -296,7 +558,7 @@ function Results() {
           </ChartContainer>
 
           <ChartContainer style={{ gridColumn: "1 / -1" }}>
-            <ChartTitle>Model Comparison: SVM vs Random Forest vs XGBoost</ChartTitle>
+            <ChartTitle>Model Comparison: SVM vs XGBoost</ChartTitle>
             <ResponsiveContainer width="100%" height="80%">
               <BarChart data={modelComparisonData}>
                 <CartesianGrid strokeDasharray="3 3" stroke={cyberTheme.border} />
@@ -312,12 +574,7 @@ function Results() {
                     dataKey="accuracy"
                     position="top"
                     formatter={(v: any) => `${Number(v ?? 0).toFixed(2)}%`}
-                    style={{
-                      fill: cyberTheme.text,
-                      fontFamily: cyberTheme.fontMono,
-                      fontWeight: 800,
-                      textShadow: "0 0 16px rgba(0, 242, 234, 0.55)",
-                    }}
+                    style={{ fill: cyberTheme.text, fontFamily: cyberTheme.fontMono, fontWeight: 800 }}
                   />
                 </Bar>
               </BarChart>
@@ -325,6 +582,7 @@ function Results() {
           </ChartContainer>
         </ChartGrid>
 
+        {/* ── Predictions Table ── */}
         <div style={{ overflowX: "auto" }}>
           <Table>
             <thead>
@@ -370,3 +628,4 @@ function Results() {
 }
 
 export default Results
+
