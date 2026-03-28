@@ -9,52 +9,34 @@ from datetime import datetime
 
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.svm import SVC
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
     accuracy_score, classification_report,
     confusion_matrix, precision_score, recall_score, f1_score
 )
 from xgboost import XGBClassifier
 
-# ─── Tee output to both console and report file ────────────────────────────────
-report_lines = []
-
-class Tee:
-    def __init__(self, *streams):
-        self.streams = streams
-    def write(self, data):
-        for s in self.streams:
-            s.write(data)
-    def flush(self):
-        for s in self.streams:
-            s.flush()
-
-_orig_stdout = sys.stdout
-sys.stdout = Tee(_orig_stdout, io.StringIO())   # will swap for real capture below
-
-# Use a list so we can append inside functions
+# ─── Log capture ────────────────────────────────────────────────────────────────
 log = []
 
 def pr(msg=""):
     print(msg)
-    log.append(msg)
+    log.append(str(msg))
 
 # ──────────────────────────────────────────────────────────────────────────────
 
 pr("=" * 60)
-pr("  NSL-KDD IDS  |  SVM  +  XGBoost  |  Mixed Test Set")
+pr("  NSL-KDD IDS  |  SVM (Binary)  +  XGBoost (Multiclass)")
 pr(f"  Run Date : {datetime.now().strftime('%Y-%m-%d  %H:%M:%S')}")
 pr("=" * 60)
 
 pr("""
 EVALUATION STRATEGY
 -------------------------------------------------------------
-  Train  : 80% of KDDTrain+  (same-distribution, seen data)
-  Test   : 20% KDDTrain+ val  +  60% KDDTest+ (unseen attacks)
+  Train  : Full KDDTrain+  (all 125,973 samples)
+  Test   : Full KDDTest+   (all 22,544 samples — unseen)
 
-  WHY: KDDTest+ contains 17 attack types NOT in KDDTrain+.
-       Blending them gives a realistic ~91-93% accuracy that
-       reflects real-world generalization, not inflated 99%.
+  SVM    → Binary: Normal vs Attack
+  XGBoost → Multiclass: DoS / Probe / R2L / U2R / Normal
 -------------------------------------------------------------
 """)
 
@@ -105,20 +87,20 @@ test_df.drop("difficulty",  axis=1, inplace=True)
 train_df["label_cat"] = train_df["label"].map(attack_to_cat).fillna("r2l")
 test_df["label_cat"]  = test_df["label"].map(attack_to_cat).fillna("r2l")
 
-pr(f"    KDDTrain+ : {len(train_df):,} samples")
-pr(f"    KDDTest+  : {len(test_df):,} samples  (17 unseen attack types)")
+pr(f"    KDDTrain+ : {len(train_df):,} samples  (training set)")
+pr(f"    KDDTest+  : {len(test_df):,} samples   (full unseen test set)")
 
 # ─────────────────────────────────
 # Labels
 # ─────────────────────────────────
 
-y_tr_bin = (train_df["label"] != "normal").astype(int).values
-y_te_bin = (test_df["label"]  != "normal").astype(int).values
+y_train_bin = (train_df["label"] != "normal").astype(int).values
+y_test_bin  = (test_df["label"]  != "normal").astype(int).values
 
 label_enc_cat = LabelEncoder()
-label_enc_cat.fit(["dos","normal","probe","r2l","u2r"])
-y_tr_5c = label_enc_cat.transform(train_df["label_cat"])
-y_te_5c = label_enc_cat.transform(test_df["label_cat"])
+label_enc_cat.fit(["dos", "normal", "probe", "r2l", "u2r"])
+y_train_5c = label_enc_cat.transform(train_df["label_cat"])
+y_test_5c  = label_enc_cat.transform(test_df["label_cat"])
 
 label_enc_fine = LabelEncoder()
 label_enc_fine.fit(train_df["label"])
@@ -128,10 +110,10 @@ label_enc_fine.fit(train_df["label"])
 # ─────────────────────────────────
 
 pr("\n[2] OneHot Encoding ...")
-X_tr_raw = train_df.drop(columns=["label","label_cat"])
-X_te_raw = test_df.drop(columns=["label","label_cat"])
+X_tr_raw = train_df.drop(columns=["label", "label_cat"])
+X_te_raw = test_df.drop(columns=["label", "label_cat"])
 combined     = pd.concat([X_tr_raw, X_te_raw], axis=0)
-combined_ohe = pd.get_dummies(combined, columns=["protocol_type","service","flag"])
+combined_ohe = pd.get_dummies(combined, columns=["protocol_type", "service", "flag"])
 
 n = len(X_tr_raw)
 X_train_ohe = combined_ohe.iloc[:n].reset_index(drop=True).astype(float)
@@ -142,133 +124,90 @@ joblib.dump(all_features, "feature_columns.pkl")
 pr(f"    Total features after OHE: {len(all_features)}")
 
 # ─────────────────────────────────
-# Build Mixed Test Set
+# Scale (fit on TRAIN only)
 # ─────────────────────────────────
 
-pr("\n[3] Building mixed test set ...")
-
-# 80/20 split of KDDTrain+
-X_tr80, X_val20, y_bin_tr80, y_bin_val20, y_5c_tr80, y_5c_val20 = train_test_split(
-    X_train_ohe.values, y_tr_bin, y_tr_5c,
-    test_size=0.20, random_state=42, stratify=y_tr_bin
-)
-
-# Sample 60% of KDDTest+ (unseen attacks)
-idx = np.random.RandomState(42).choice(
-    len(X_test_ohe), size=int(0.60 * len(X_test_ohe)), replace=False
-)
-idx = np.sort(idx)
-X_hard      = X_test_ohe.values[idx]
-y_bin_hard  = y_te_bin[idx]
-y_5c_hard   = y_te_5c[idx]
-
-# Combine for final test set
-X_test_mix   = np.vstack([X_val20,     X_hard])
-y_bin_mix    = np.concatenate([y_bin_val20, y_bin_hard])
-y_5c_mix     = np.concatenate([y_5c_val20,  y_5c_hard])
-
-pr(f"    Training set (80% KDDTrain+)    : {len(X_tr80):,}")
-pr(f"    Test — same dist (20% KDDTrain+): {len(X_val20):,}")
-pr(f"    Test — unseen    (60% KDDTest+) : {len(X_hard):,}")
-pr(f"    Total test set                  : {len(X_test_mix):,}")
-
-# ─────────────────────────────────
-# Scale
-# ─────────────────────────────────
-
-pr("\n[4] Scaling (fit on train only) ...")
+pr("\n[3] Scaling (fit on KDDTrain+ only) ...")
 scaler = StandardScaler()
-X_train_s = scaler.fit_transform(X_tr80)
-X_test_s  = scaler.transform(X_test_mix)
+X_train_s = scaler.fit_transform(X_train_ohe.values)
+X_test_s  = scaler.transform(X_test_ohe.values)
 joblib.dump(scaler, "scaler.pkl")
 
-X_fit,  X_es,  y_fit,  y_es  = train_test_split(X_train_s, y_bin_tr80, test_size=0.10, random_state=42, stratify=y_bin_tr80)
-X_fit5, X_es5, y_fit5, y_es5 = train_test_split(X_train_s, y_5c_tr80,  test_size=0.10, random_state=42, stratify=y_5c_tr80)
+pr(f"    Training samples : {len(X_train_s):,}")
+pr(f"    Test samples     : {len(X_test_s):,}  (full KDDTest+)")
 
 # ─────────────────────────────────
-# MODEL 1: SVM — Normal vs Attack
+# MODEL 1: SVM — Binary (Normal vs Attack)
 # ─────────────────────────────────
 
-pr("\n[5] Training MODEL 1: SVM (Binary — Normal vs Attack) ...")
-svm_model = SVC(kernel="rbf", C=10, gamma="scale",
-                class_weight="balanced", probability=True, random_state=42)
-svm_model.fit(X_train_s, y_bin_tr80)
+pr("\n[4] Training MODEL 1: SVM (Binary — Normal vs Attack) ...")
+svm_model = SVC(
+    kernel="rbf",
+    C=10,
+    gamma="scale",
+    class_weight="balanced",
+    probability=True,
+    random_state=42
+)
+svm_model.fit(X_train_s, y_train_bin)
 
 svm_pred = svm_model.predict(X_test_s)
-svm_acc  = accuracy_score(y_bin_mix, svm_pred)
-svm_f1   = f1_score(y_bin_mix, svm_pred, average="weighted")
-svm_prec = precision_score(y_bin_mix, svm_pred, average="weighted")
-svm_rec  = recall_score(y_bin_mix, svm_pred, average="weighted")
+svm_acc  = accuracy_score(y_test_bin, svm_pred)
+svm_f1   = f1_score(y_test_bin, svm_pred, average="weighted")
+svm_prec = precision_score(y_test_bin, svm_pred, average="weighted")
+svm_rec  = recall_score(y_test_bin, svm_pred, average="weighted")
 
 pr(f"\n    SVM Accuracy  : {svm_acc*100:.2f}%")
 pr(f"    SVM F1-Score  : {svm_f1*100:.2f}%")
 pr(f"    SVM Precision : {svm_prec*100:.2f}%")
 pr(f"    SVM Recall    : {svm_rec*100:.2f}%")
 pr("")
-pr(classification_report(y_bin_mix, svm_pred, target_names=["Normal","Attack"]))
+pr(classification_report(y_test_bin, svm_pred, target_names=["Normal", "Attack"]))
 
 # ─────────────────────────────────
-# MODEL 2: XGBoost — 5-class
+# MODEL 2: XGBoost — 5-class Multiclass
 # ─────────────────────────────────
 
-pr("\n[6] Training MODEL 2: XGBoost (5-class — DoS/Probe/R2L/U2R/Normal) ...")
+pr("\n[5] Training MODEL 2: XGBoost (5-class — DoS/Probe/R2L/U2R/Normal) ...")
 
 xgb_model = XGBClassifier(
-    n_estimators          = 300,
-    max_depth             = 6,
-    learning_rate         = 0.1,
-    subsample             = 0.8,
-    colsample_bytree      = 0.8,
-    objective             = "multi:softmax",
-    num_class             = 5,
-    eval_metric           = "mlogloss",
-    use_label_encoder     = False,
-    early_stopping_rounds = 20,
-    random_state          = 42,
-    n_jobs                = -1,
-    tree_method           = "hist"
+    n_estimators      = 300,
+    max_depth         = 6,
+    learning_rate     = 0.1,
+    subsample         = 0.8,
+    colsample_bytree  = 0.8,
+    objective         = "multi:softmax",
+    num_class         = 5,
+    eval_metric       = "mlogloss",
+    use_label_encoder = False,
+    random_state      = 42,
+    n_jobs            = -1,
+    tree_method       = "hist"
 )
-xgb_model.fit(X_fit5, y_fit5, eval_set=[(X_es5, y_es5)], verbose=False)
+xgb_model.fit(X_train_s, y_train_5c, verbose=False)
 
 xgb_pred = xgb_model.predict(X_test_s)
-xgb_acc  = accuracy_score(y_5c_mix, xgb_pred)
-xgb_f1   = f1_score(y_5c_mix, xgb_pred, average="weighted")
-xgb_prec = precision_score(y_5c_mix, xgb_pred, average="weighted")
-xgb_rec  = recall_score(y_5c_mix, xgb_pred, average="weighted")
+xgb_acc  = accuracy_score(y_test_5c, xgb_pred)
+xgb_f1   = f1_score(y_test_5c, xgb_pred, average="weighted")
+xgb_prec = precision_score(y_test_5c, xgb_pred, average="weighted")
+xgb_rec  = recall_score(y_test_5c, xgb_pred, average="weighted")
 
 pr(f"\n    XGBoost Accuracy  : {xgb_acc*100:.2f}%")
 pr(f"    XGBoost F1-Score  : {xgb_f1*100:.2f}%")
 pr(f"    XGBoost Precision : {xgb_prec*100:.2f}%")
 pr(f"    XGBoost Recall    : {xgb_rec*100:.2f}%")
 pr("")
-pr(classification_report(y_5c_mix, xgb_pred,
+pr(classification_report(y_test_5c, xgb_pred,
       target_names=label_enc_cat.classes_))
-
-# ─────────────────────────────────
-# Overfitting Check
-# ─────────────────────────────────
-
-pr("\n[7] Overfitting / Generalization Check ...")
-svm_train_acc = accuracy_score(y_bin_tr80, svm_model.predict(X_train_s))
-gap = svm_train_acc - svm_acc
-pr(f"    SVM Train Acc  : {svm_train_acc*100:.2f}%")
-pr(f"    SVM Test  Acc  : {svm_acc*100:.2f}%")
-pr(f"    Gap            : {gap*100:.2f}%", )
-if gap < 0.05:
-    pr("    Verdict        : [OK] Well-generalized (gap < 5%)")
-elif gap < 0.10:
-    pr("    Verdict        : [WARN] Slight overfit (gap 5-10%) -- acceptable")
-else:
-    pr("    Verdict        : [FAIL] Overfit (gap > 10%) -- increase regularization")
 
 # ─────────────────────────────────
 # Confusion Matrix
 # ─────────────────────────────────
 
-cm = confusion_matrix(y_bin_mix, svm_pred)
+cm = confusion_matrix(y_test_bin, svm_pred)
 np.save("confusion_matrix.npy", cm)
 
-pr("\n[8] Confusion Matrix (SVM Binary):")
+pr("\n[6] Confusion Matrix (SVM Binary):")
 pr(f"    {'':20s}  Predicted Normal  Predicted Attack")
 pr(f"    {'Actual Normal':20s}  {cm[0][0]:>15,}  {cm[0][1]:>15,}")
 pr(f"    {'Actual Attack':20s}  {cm[1][0]:>15,}  {cm[1][1]:>15,}")
@@ -288,7 +227,7 @@ metrics = {
     "rf_f1":         float(xgb_f1),
     "rf_recall":     float(xgb_rec),
     "rf_precision":  float(xgb_prec),
-    "split":         "80% KDDTrain+ train | 20% KDDTrain+ val + 60% KDDTest+ test"
+    "split":         "Full KDDTrain+ train | Full KDDTest+ test"
 }
 
 with open("metrics.json", "w") as f:
@@ -304,7 +243,7 @@ joblib.dump(xgb_model,      "rf_model.pkl")
 joblib.dump(label_enc_cat,  "label_encoder.pkl")
 joblib.dump(label_enc_fine, "label_encoder_fine.pkl")
 
-pr("\n[9] All models saved:")
+pr("\n[7] All models saved:")
 pr("    svm_model.pkl  — SVM binary classifier")
 pr("    xgb_model.pkl  — XGBoost 5-class categorizer")
 pr("    scaler.pkl     — StandardScaler")
@@ -317,7 +256,10 @@ pr("    feature_columns.pkl")
 pr(f"\n{'='*60}")
 pr("  FINAL RESULTS")
 pr(f"{'='*60}")
-pr(f"  MODEL 1 — SVM  (Normal vs Attack)")
+pr(f"  TRAIN : Full KDDTrain+ ({len(X_train_s):,} samples)")
+pr(f"  TEST  : Full KDDTest+  ({len(X_test_s):,} samples — complete unseen set)")
+pr(f"")
+pr(f"  MODEL 1 — SVM  (Normal vs Attack — Binary)")
 pr(f"    Accuracy  : {svm_acc*100:.2f}%")
 pr(f"    F1-Score  : {svm_f1*100:.2f}%")
 pr(f"    Precision : {svm_prec*100:.2f}%")
@@ -328,11 +270,6 @@ pr(f"    Accuracy  : {xgb_acc*100:.2f}%")
 pr(f"    F1-Score  : {xgb_f1*100:.2f}%")
 pr(f"    Precision : {xgb_prec*100:.2f}%")
 pr(f"    Recall    : {xgb_rec*100:.2f}%")
-pr(f"")
-pr(f"  TEST SET COMPOSITION")
-pr(f"    {len(X_val20):,} easy samples  (20% KDDTrain+ — seen distribution)")
-pr(f"    {len(X_hard):,} hard samples  (60% KDDTest+  — 17 UNSEEN attack types)")
-pr(f"    {len(X_test_mix):,} total test samples")
 pr(f"{'='*60}")
 
 # ─────────────────────────────────
