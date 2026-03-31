@@ -201,9 +201,10 @@ pr(classification_report(y_test_5c, xgb_pred,
       target_names=label_enc_cat.classes_))
 
 # ─────────────────────────────────
-# Confusion Matrix
+# Confusion Matrices
 # ─────────────────────────────────
 
+# SVM Binary CM
 cm = confusion_matrix(y_test_bin, svm_pred)
 np.save("confusion_matrix.npy", cm)
 
@@ -216,14 +217,30 @@ pr(f"    False Positives (FP): {cm[0][1]:,}  ← Normal flagged as Attack")
 pr(f"    False Negatives (FN): {cm[1][0]:,}  ← Attack missed")
 pr(f"    True Positives (TP) : {cm[1][1]:,}")
 
+# XGBoost 5-class CM
+cm_multi = confusion_matrix(y_test_5c, xgb_pred)
+np.save("confusion_matrix_multi.npy", cm_multi)
+# Save class labels order so frontend can label axes
+with open("cm_multi_labels.json", "w") as f:
+    json.dump(list(label_enc_cat.classes_), f)
+pr("\n    XGBoost 5-class confusion matrix saved.")
+
 # ─────────────────────────────────
 # Save Metrics
 # ─────────────────────────────────
 
 metrics = {
+    # SVM — Binary
     "svm_accuracy":  float(svm_acc),
-    "rf_accuracy":   float(xgb_acc),
+    "svm_f1":        float(svm_f1),
+    "svm_precision": float(svm_prec),
+    "svm_recall":    float(svm_rec),
+    # XGBoost — 5-class (also kept under rf_ keys for backwards compat)
     "xgb_accuracy":  float(xgb_acc),
+    "xgb_f1":        float(xgb_f1),
+    "xgb_precision": float(xgb_prec),
+    "xgb_recall":    float(xgb_rec),
+    "rf_accuracy":   float(xgb_acc),
     "rf_f1":         float(xgb_f1),
     "rf_recall":     float(xgb_rec),
     "rf_precision":  float(xgb_prec),

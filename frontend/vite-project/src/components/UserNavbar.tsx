@@ -131,9 +131,17 @@ const NavBtn = styled.button<{ $active?: boolean }>`
   text-transform: uppercase;
   letter-spacing: 0.08em;
   border-bottom: 2px solid ${p => p.$active ? cyberTheme.primary : "transparent"};
-  transition: color 0.2s, border-color 0.2s;
+  transition: all 0.3s ease;
+  outline: none;
+
+  &:focus, &:focus-visible {
+    outline: none !important;
+  }
+
   &:hover {
     color: ${cyberTheme.primary};
+    text-shadow: 0 0 8px rgba(0, 242, 234, 0.6);
+    border-bottom: 2px solid ${p => p.$active ? cyberTheme.primary : 'rgba(0, 242, 234, 0.5)'};
   }
 `
 
@@ -150,6 +158,12 @@ const LogoutBtn = styled.button`
   margin-left: 0.5rem;
   flex-shrink: 0;
   transition: all 0.2s;
+  outline: none;
+  
+  &:focus, &:focus-visible {
+    outline: none !important;
+  }
+  
   &:hover {
     background: ${cyberTheme.danger};
     color: #000;

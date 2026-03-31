@@ -251,20 +251,24 @@ const MTd = styled.td`
 `
 
 const ValueBar = styled.div<{ $pct: number; $accent: string }>`
-  height: 5px;
+  height: 10px;
   width: 100%;
-  background: ${cyberTheme.border}55;
-  border-radius: 3px;
-  margin-top: 3px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 5px;
   overflow: hidden;
+  position: relative;
   &::after {
     content: '';
     display: block;
+    position: absolute;
+    left: 0;
+    top: 0;
     height: 100%;
-    width: ${p => p.$pct}%;
-    background: ${p => p.$accent};
-    border-radius: 3px;
-    box-shadow: 0 0 6px ${p => p.$accent};
+    width: ${p => Math.max(p.$pct, 3)}%;
+    background: linear-gradient(90deg, ${p => p.$accent}bb, ${p => p.$accent});
+    border-radius: 5px;
+    box-shadow: 0 0 8px ${p => p.$accent}99;
+    transition: width 0.6s ease;
   }
 `
 
@@ -322,6 +326,57 @@ const CmLabel = styled.div`
   margin-top: 4px;
 `
 
+// ── multiclass CM styled components ─────────────────────────────
+const MultiCmWrapper = styled.div`
+  margin-bottom: 1.5rem;
+  border: 1px solid ${cyberTheme.border};
+  background: rgba(0,0,0,0.45);
+  padding: 1.25rem 1.5rem;
+  overflow-x: auto;
+`
+
+const MultiCmGrid = styled.div<{ $cols: number }>`
+  display: grid;
+  grid-template-columns: auto repeat(${p => p.$cols}, 1fr);
+  gap: 5px;
+  min-width: ${p => p.$cols * 90 + 80}px;
+  margin: 0 auto;
+`
+
+const MultiCmHeaderCell = styled.div<{ $color?: string }>`
+  font-family: ${cyberTheme.fontMono};
+  font-size: 0.68rem;
+  color: ${p => p.$color || cyberTheme.textMuted};
+  text-align: center;
+  padding: 4px 6px;
+  letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  text-transform: uppercase;
+`
+
+const MultiCmCell = styled.div<{ $intensity: number; $isDiag: boolean }>`
+  background: ${p => p.$isDiag
+    ? `rgba(0, 242, 234, ${0.08 + p.$intensity * 0.55})`
+    : `rgba(239, 68, 68, ${0.05 + p.$intensity * 0.45})`};
+  border: 1px solid ${p => p.$isDiag ? '#00f2ea33' : '#ef444433'};
+  border-radius: 5px;
+  padding: 0.55rem 0.35rem;
+  text-align: center;
+  font-family: ${cyberTheme.fontMono};
+  transition: transform 0.15s;
+  &:hover { transform: scale(1.05); }
+`
+
+const MultiCmValue = styled.div<{ $isDiag: boolean }>`
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: ${p => p.$isDiag ? cyberTheme.primary : '#ef4444'};
+  font-family: ${cyberTheme.fontDisplay};
+`
+
 // ── component ─────────────────────────────────────────────────
 function Results() {
   const location = useLocation()
@@ -334,6 +389,8 @@ function Results() {
   const modelComparisonData  = data?.graph_svm_vs_rf         || []
   const metrics              = data?.metrics                 || {}
   const cm: number[][]       = data?.confusion_matrix        || [[0,0],[0,0]]
+  const cmMulti: number[][]  = data?.confusion_matrix_multi  || []
+  const cmMultiLabels: string[] = data?.cm_multi_labels || ["dos","normal","probe","r2l","u2r"]
 
   if (results.length === 0) {
     return (
@@ -359,10 +416,10 @@ function Results() {
     return cyberTheme.success
   }
 
-  // Model metrics rows — bars scaled to 80-100% range so small differences are visible
+  // Model metrics — value format and bar width (0–100 scale)
   const fmt = (v: number | undefined) =>
     v !== undefined ? `${(v * 100).toFixed(2)}%` : "—"
-  const scaledBar = (v: number) => Math.max(0, Math.min(100, ((v - 80) / 20) * 100))
+  const scaledBar = (v: number) => Math.max(2, Math.min(100, v))
 
   const metricColors = {
     Accuracy:   "#00f2ea",   // primary cyan
@@ -484,7 +541,7 @@ function Results() {
             Confusion Matrix — SVM Binary (Unseen KDDTest+ Data)
           </ChartTitle>
           <p style={{ textAlign:"center", fontSize:"0.72rem", color: cyberTheme.textMuted, fontFamily: cyberTheme.fontMono, marginBottom:"1.25rem" }}>
-            Evaluated on {total.toLocaleString()} samples &nbsp;|&nbsp; 20% KDDTrain+ val&nbsp;+&nbsp;60% KDDTest+ (unseen attacks)
+            Evaluated on {total.toLocaleString()} samples &nbsp;|&nbsp; Full KDDTest+ (complete unseen set — 22,544 samples)
           </p>
           <CmGrid>
             {/* top-left corner */}
@@ -521,6 +578,61 @@ function Results() {
           </CmGrid>
         </CmWrapper>
 
+        {/* ── XGBoost Multiclass Confusion Matrix ── */}
+        {cmMulti.length > 0 && (() => {
+          const n = cmMultiLabels.length
+          const flatMax = Math.max(...cmMulti.flat()) || 1
+          const labelColors: Record<string,string> = {
+            dos:    cyberTheme.danger,
+            normal: cyberTheme.success,
+            probe:  cyberTheme.warning,
+            r2l:    "#a855f7",
+            u2r:    "#38bdf8",
+          }
+          return (
+            <MultiCmWrapper>
+              <ChartTitle style={{ marginBottom: "0.5rem" }}>
+                Confusion Matrix — XGBoost 5-Class (Unseen KDDTest+ Data)
+              </ChartTitle>
+              <p style={{ textAlign:"center", fontSize:"0.72rem", color: cyberTheme.textMuted, fontFamily: cyberTheme.fontMono, marginBottom:"1.25rem" }}>
+                Rows = Actual class &nbsp;|&nbsp; Columns = Predicted class &nbsp;|&nbsp; Diagonal = Correct predictions
+              </p>
+              <MultiCmGrid $cols={n}>
+                {/* top-left corner */}
+                <MultiCmHeaderCell />
+                {/* column headers */}
+                {cmMultiLabels.map((lbl, ci) => (
+                  <MultiCmHeaderCell key={`ch-${ci}`} $color={labelColors[lbl] || cyberTheme.primary}>
+                    {lbl.toUpperCase()}
+                  </MultiCmHeaderCell>
+                ))}
+
+                {/* rows */}
+                {cmMulti.map((row, ri) => (
+                  <>
+                    <MultiCmHeaderCell key={`rh-${ri}`} $color={labelColors[cmMultiLabels[ri]] || cyberTheme.primary}>
+                      {cmMultiLabels[ri]?.toUpperCase()}
+                    </MultiCmHeaderCell>
+                    {row.map((val, ci) => (
+                      <MultiCmCell key={`cell-${ri}-${ci}`} $intensity={val / flatMax} $isDiag={ri === ci}>
+                        <MultiCmValue $isDiag={ri === ci}>{val.toLocaleString()}</MultiCmValue>
+                      </MultiCmCell>
+                    ))}
+                  </>
+                ))}
+              </MultiCmGrid>
+              <div style={{ display:"flex", gap:"1.5rem", justifyContent:"center", marginTop:"1rem", flexWrap:"wrap" }}>
+                {cmMultiLabels.map(lbl => (
+                  <div key={lbl} style={{ display:"flex", alignItems:"center", gap:6, fontFamily: cyberTheme.fontMono, fontSize:"0.7rem", color: cyberTheme.textMuted }}>
+                    <span style={{ width:10, height:10, borderRadius:2, background: labelColors[lbl] || cyberTheme.primary, display:"inline-block" }} />
+                    {lbl.toUpperCase()}
+                  </div>
+                ))}
+              </div>
+            </MultiCmWrapper>
+          )
+        })()}
+
         {/* ── Charts ── */}
         <ChartGrid>
           <ChartContainer>
@@ -548,11 +660,19 @@ function Results() {
             <ResponsiveContainer width="100%" height="80%">
               <BarChart data={afterValidationData}>
                 <CartesianGrid strokeDasharray="3 3" stroke={cyberTheme.border} />
-                <XAxis dataKey="name" stroke={cyberTheme.textMuted} />
+                <XAxis dataKey="name" stroke={cyberTheme.textMuted} tick={{ fontSize: 11 }} />
                 <YAxis stroke={cyberTheme.textMuted} />
                 <RechartsTooltip contentStyle={tooltipStyle} />
-                <Legend />
-                <Bar dataKey="value" fill={cyberTheme.primary} name="Traffic Count" />
+                <Bar dataKey="value" name="Traffic Count">
+                  {afterValidationData.map((_: any, i: number) => (
+                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                  ))}
+                  <LabelList
+                    dataKey="value"
+                    position="top"
+                    style={{ fill: cyberTheme.text, fontFamily: cyberTheme.fontMono, fontSize: 11, fontWeight: 700 }}
+                  />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </ChartContainer>

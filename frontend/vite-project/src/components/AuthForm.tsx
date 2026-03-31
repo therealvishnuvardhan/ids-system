@@ -45,11 +45,11 @@ const StyledWrapper = styled.div`
     text-align: center;
     margin-bottom: 1.5rem;
     color: var(--primary-color);
-    font-family: "Orbitron", "Fira Code", sans-serif;
+    font-family: "Dela Gothic One", "Noto Serif JP", sans-serif;
     font-size: 2.25rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.15em;
+    letter-spacing: 0.08em;
     text-shadow: 0 0 20px rgba(0, 242, 234, 0.4);
   }
 
@@ -479,6 +479,9 @@ function AuthForm({
                 Have credentials? Initiate connection
               </Link>
             )}
+            <Link to="/" className="auth-link" style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "0.5rem", opacity: 0.45, fontSize: "0.75rem", marginTop: "0.5rem" }}>
+              ← Back to Home
+            </Link>
           </div>
         </form>
       </div>

@@ -157,13 +157,24 @@ async def upload_csv(file: UploadFile = File(...)):
 
         cm = np.load(os.path.join(BASE_DIR, "confusion_matrix.npy")).tolist()
 
+        cm_multi_path  = os.path.join(BASE_DIR, "confusion_matrix_multi.npy")
+        cm_labels_path = os.path.join(BASE_DIR, "cm_multi_labels.json")
+        cm_multi        = np.load(cm_multi_path).tolist() if os.path.exists(cm_multi_path) else []
+        if os.path.exists(cm_labels_path):
+            with open(cm_labels_path) as _f:
+                cm_multi_labels = json.load(_f)
+        else:
+            cm_multi_labels = ["dos", "normal", "probe", "r2l", "u2r"]
+
         return {
             "predictions":             predictions,
             "metrics":                 metrics,
             "graph_before_validation": before_validation_data,
             "graph_after_validation":  [{"name": k, "value": v} for k, v in after_val_counts.items()],
             "graph_svm_vs_rf":         svm_rf_comparison,
-            "confusion_matrix":        cm
+            "confusion_matrix":        cm,
+            "confusion_matrix_multi":  cm_multi,
+            "cm_multi_labels":         cm_multi_labels,
         }
 
     except Exception as e:

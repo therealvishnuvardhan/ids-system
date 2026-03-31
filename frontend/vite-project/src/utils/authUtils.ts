@@ -235,3 +235,8 @@ export function removeUser(username: string) {
   addAuditLog({ type: "user_removed", user: username, details: `Admin removed user ${username}` })
 }
 
+export function deleteUploadHistory(id: string) {
+  const current = getUploadHistory()
+  const updated = current.filter((record) => record.id !== id)
+  saveUploadHistory(updated)
+}

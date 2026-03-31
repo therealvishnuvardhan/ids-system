@@ -239,7 +239,7 @@ function Dashboard() {
       <PageWrapper>
         <HeroSection>
           <HeroTitle>
-            <GlitchText data-text="Intrusion Detection System">Intrusion Detection System</GlitchText>
+            <GlitchText data-text="USER ACCESS PANEL">USER ACCESS PANEL</GlitchText>
           </HeroTitle>
           <HeroDesc>
             Real-time network anomaly analysis. Detect threats, neutralize breaches.

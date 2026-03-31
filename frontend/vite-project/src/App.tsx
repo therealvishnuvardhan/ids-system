@@ -17,6 +17,8 @@ import Results from "./pages/Results"
 import Alerts from "./pages/Alerts"
 import Reports from "./pages/Reports"
 import History from "./pages/History"
+import LandingPage from "./pages/LandingPage"
+import AboutPage from "./pages/AboutPage"
 
 
 function AppContent(){
@@ -28,6 +30,7 @@ function AppContent(){
     location.pathname === "/login" ||
     location.pathname === "/signup" ||
     location.pathname === "/" ||
+    location.pathname === "/about" ||
     location.pathname.startsWith("/admin")
 
   return(
@@ -38,7 +41,9 @@ function AppContent(){
 
       <Routes>
 
-        <Route path="/" element={<Signup/>} />
+        <Route path="/" element={<LandingPage />} />
+
+        <Route path="/about" element={<AboutPage />} />
 
         <Route path="/signup" element={<Signup/>} />
 
