@@ -180,7 +180,6 @@ const links = [
   { to: "/admin/config", label: "Config" },
   { to: "/admin/audit", label: "Audit" },
   { to: "/admin/sessions", label: "Sessions" },
-  { to: "/admin/performance", label: "Performance" },
 ] as const
 
 function CyberConfirmModal({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {

@@ -3,13 +3,13 @@ import styled, { keyframes } from "styled-components"
 import MatrixHelix from "../components/MatrixHelix"
 
 const G = {
-  main:    "rgb(46, 213, 115)",
+  main: "rgb(46, 213, 115)",
   mainRgb: "46, 213, 115",
-  dim:     "rgba(46, 213, 115, 0.55)",
-  border:  "rgba(46, 213, 115, 0.18)",
-  bg:      "rgba(46, 213, 115, 0.04)",
-  text:    "#e5e5e5",
-  muted:   "rgba(229,229,229,0.72)",
+  dim: "rgba(46, 213, 115, 0.55)",
+  border: "rgba(46, 213, 115, 0.18)",
+  bg: "rgba(46, 213, 115, 0.04)",
+  text: "#e5e5e5",
+  muted: "rgba(229,229,229,0.72)",
 }
 
 /* ─── Keyframes ──────────────────────────────────────────────── */
@@ -330,14 +330,14 @@ export default function AboutPage() {
         <BackBtn onClick={() => navigate("/")}>← Back to Home</BackBtn>
 
         <PageLabel>⬡ &nbsp; System Documentation &nbsp; ⬡</PageLabel>
-        <PageTitle>About NETGUARD IDS</PageTitle>
+        <PageTitle>About IDS</PageTitle>
         <TitleUnderline />
         {/* Overview */}
         <Section $delay={0.6}>
           <SectionLabel>01 / Overview</SectionLabel>
-          <SectionTitle>What is NETGUARD IDS?</SectionTitle>
+          <SectionTitle>What is IDS?</SectionTitle>
           <Body>
-            <HighlightWord>NETGUARD IDS</HighlightWord> is an AI-powered
+            <HighlightWord>IDS</HighlightWord> is an AI-powered
             Intrusion Detection System (IDS) built to identify and categorize
             malicious network traffic in real time. It uses a two-stage machine
             learning pipeline — first detecting whether traffic is anomalous,

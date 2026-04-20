@@ -53,7 +53,6 @@ function AdminHome() {
     ["Config", "/admin/config"],
     ["Audit Logs", "/admin/audit"],
     ["Sessions", "/admin/sessions"],
-    ["Performance", "/admin/performance"],
   ] as const
 
   return (

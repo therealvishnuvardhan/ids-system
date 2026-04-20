@@ -210,7 +210,6 @@ function AdminNavbar() {
           <NavLink to="/admin/config">Config</NavLink>
           <NavLink to="/admin/audit">Audit</NavLink>
           <NavLink to="/admin/sessions">Sessions</NavLink>
-          <NavLink to="/admin/performance">Performance</NavLink>
         </Links>
       </div>
       <LogoutBtn onClick={handleLogout}>Shut Down</LogoutBtn>

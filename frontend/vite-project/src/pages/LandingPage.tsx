@@ -314,8 +314,8 @@ export default function LandingPage() {
   const [statusModal, setStatusModal] = useState<string | null>(null)
 
   useEffect(() => {
-    if (localStorage.getItem("isLoggedIn")) navigate("/dashboard")
-  }, [navigate])
+    // Landing page is always visible — no auto-redirect
+  }, [])
 
   const handleEnter = () => {
     setStatusModal("ENTERING AUTHENTICATION PANEL...")

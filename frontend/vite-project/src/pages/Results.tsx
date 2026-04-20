@@ -200,6 +200,38 @@ const ModelComparisonTooltip = ({ active, payload, label }: any) => {
   )
 }
 
+const ChartTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload || payload.length === 0) return null
+  const entry = payload[0]
+  const color = entry?.payload?.fill || entry?.color || cyberTheme.primary
+  const name  = entry?.name || label || entry?.payload?.name || ""
+  const value = entry?.value ?? 0
+  return (
+    <div
+      style={{
+        backgroundColor: "rgba(10, 10, 10, 0.95)",
+        border: `1px solid ${cyberTheme.border}`,
+        borderRadius: 8,
+        padding: "10px 14px",
+        fontFamily: cyberTheme.fontMono,
+        boxShadow: `0 0 28px rgba(0, 242, 234, 0.2)`,
+        pointerEvents: "none",
+        minWidth: 140,
+      }}
+    >
+      <div style={{ color: cyberTheme.textMuted, fontSize: "0.72rem", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+        {name}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ width: 10, height: 10, borderRadius: 2, background: color, boxShadow: `0 0 10px ${color}`, display: "inline-block" }} />
+        <span style={{ color: "#ffffff", fontWeight: 800, fontSize: "1.1rem", textShadow: "0 0 12px rgba(255,255,255,0.4)" }}>
+          {value.toLocaleString()}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 // ── extra styled components ──────────────────────────────────
 const MetricsGrid = styled.div`
   display: grid;
@@ -644,13 +676,14 @@ function Results() {
                   cx="50%" cy="50%" outerRadius={90}
                   dataKey="value"
                   label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                  labelLine={{ stroke: cyberTheme.border }}
                 >
                   {beforeValidationData.map((_: any, i: number) => (
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
                 </Pie>
-                <RechartsTooltip contentStyle={tooltipStyle} />
-                <Legend />
+                <RechartsTooltip content={ChartTooltip} />
+                <Legend wrapperStyle={{ color: cyberTheme.text, fontFamily: cyberTheme.fontMono, fontSize: "0.78rem" }} />
               </PieChart>
             </ResponsiveContainer>
           </ChartContainer>
@@ -660,9 +693,9 @@ function Results() {
             <ResponsiveContainer width="100%" height="80%">
               <BarChart data={afterValidationData}>
                 <CartesianGrid strokeDasharray="3 3" stroke={cyberTheme.border} />
-                <XAxis dataKey="name" stroke={cyberTheme.textMuted} tick={{ fontSize: 11 }} />
-                <YAxis stroke={cyberTheme.textMuted} />
-                <RechartsTooltip contentStyle={tooltipStyle} />
+                <XAxis dataKey="name" stroke={cyberTheme.textMuted} tick={{ fontSize: 11, fill: cyberTheme.text }} />
+                <YAxis stroke={cyberTheme.textMuted} tick={{ fill: cyberTheme.textMuted }} />
+                <RechartsTooltip content={ChartTooltip} />
                 <Bar dataKey="value" name="Traffic Count">
                   {afterValidationData.map((_: any, i: number) => (
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />

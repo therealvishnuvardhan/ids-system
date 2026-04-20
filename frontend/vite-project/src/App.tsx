@@ -11,7 +11,6 @@ import AdminDashboard from "./pages/AdminDashboard"
 import AdminConfig from "./pages/AdminConfig"
 import AdminAudit from "./pages/AdminAudit"
 import AdminSessions from "./pages/AdminSessions"
-import AdminPerformance from "./pages/AdminPerformance"
 import Upload from "./pages/Upload"
 import Results from "./pages/Results"
 import Alerts from "./pages/Alerts"
@@ -97,11 +96,7 @@ function AppContent(){
           </ProtectedRoute>
         }/>
 
-        <Route path="/admin/performance" element={
-          <ProtectedRoute requiredRole="admin">
-            <AdminPerformance/>
-          </ProtectedRoute>
-        }/>
+
 
         <Route path="/results" element={
           <ProtectedRoute>
